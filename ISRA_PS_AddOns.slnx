@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="../PS_AddOn_Star_Validation/LedVisibilityAddon/LedVisibilityAddon.csproj" />
+  <Project Path="ISRA.Calculations/ISRA.Calculations.csproj" />
+  <Project Path="ISRA.Components/ISRA.Components.csproj" />
+</Solution>
