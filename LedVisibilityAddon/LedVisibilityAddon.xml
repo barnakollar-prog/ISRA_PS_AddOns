@@ -1,0 +1,15 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<AddOn>
+	<Name>Star Visibility Analyzer</Name>
+	<Description>Analyzes LED emitter visibility from camera position</Description>
+	<Version>1.0</Version>
+	<DotNetPlugin>
+		<Assembly>LedVisibilityAddon.dll</Assembly>
+		<Commands>
+			<Command>
+				<Class>LedVisibilityAddon.LedVisibilityCommand</Class>
+				<Identifier>LedVisibility.Analyze</Identifier>
+			</Command>
+		</Commands>
+	</DotNetPlugin>
+</AddOn>
