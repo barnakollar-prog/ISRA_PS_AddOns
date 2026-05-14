@@ -1,5 +1,8 @@
 <Solution>
-  <Project Path="../PS_AddOn_Star_Validation/LedVisibilityAddon/LedVisibilityAddon.csproj" />
-  <Project Path="ISRA.Calculations/ISRA.Calculations.csproj" />
-  <Project Path="ISRA.Components/ISRA.Components.csproj" />
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="../PS_AddOn_Star_Validation/LedVisibilityAddon/LedVisibilityAddon.csproj" Id="79a98015-4f7a-4311-8748-1ee76feb5147" />
+  <Project Path="ISRA.Calculations/ISRA.Calculations.csproj" Id="e177cde4-a79a-4a25-aac0-5ace4f2e8f2a" />
+  <Project Path="ISRA.Components/ISRA.Components.csproj" Id="006ca160-0ab3-4a01-8305-b7bf26f7847c" />
 </Solution>

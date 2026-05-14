@@ -50,13 +50,11 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Accusite\SensorHolders\SensorHolder_Base.cs" />
     <Compile Include="Accusite\Stars\star_515_0139.cs" />
     <Compile Include="Accusite\Trackers\tracker_920_0005.cs" />
-    <Compile Include="Class1.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
-  <ItemGroup>
-    <Folder Include="Accusite\SensorHolders\" />
-  </ItemGroup>
+  <ItemGroup />
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>
