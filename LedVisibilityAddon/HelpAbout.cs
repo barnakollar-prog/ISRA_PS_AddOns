@@ -84,7 +84,7 @@ DEVELOPED BY
         {
             var dlg = new Form
             {
-                Text = "About - LED Visibility Analyzer",
+                Text = "About - Star Visibility Analyzer",
                 Width = 520,
                 Height = 580,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
@@ -96,7 +96,7 @@ DEVELOPED BY
             // Title label
             var lblTitle = new Label
             {
-                Text = "LED Visibility Analyzer",
+                Text = "Star Visibility Analyzer",
                 Left = 16,
                 Top = 12,
                 Width = 470,
