@@ -25,29 +25,27 @@ Process Simulate Add-On for AccuSite Star Validation
 VALIDATION CRITERIA
 -------------------
 
-1. STAR ORIENTATION
-   The Star self-origin Z vector must point opposite to the
-   Tracker self-origin Z vector, within the following tolerances:
+1. STAR POSITION ZONE
+   Star LED center position is evaluated in the Tracker local
+   coordinate system (MiddleField = Z origin):
 
-   - XZ plane (rotation around Y axis): max +/- 25 degrees
-   - YZ plane (rotation around X axis): max +/- 40 degrees
-
-   The Star Z vector is expressed in the Tracker local coordinate
-   system and evaluated separately per plane:
-   - XZ deviation = atan2(|localX|, |localZ|)
-   - YZ deviation = atan2(|localY|, |localZ|)
-
-   The Star Z must point opposite to Tracker Z (localZ < 0).
-
-   Note: These tolerances are preliminary and will be validated
-   on the Munich demo cell.
-
-2. STAR POSITION ZONE
-   Star position is evaluated in the Tracker local coordinate system:
-
-   - Optimal : Star local Z > 0 (Mid-Far zone, beyond tracker origin)
+   - Optimal : Star local Z > 0 (Mid-Far zone)
    - Warning : Star local Z between -803mm and 0mm (Near-Mid zone)
    - NOK     : Star local Z < -803mm (Near Field)
+
+2. EMITTER VISIBILITY
+   Each star has 4 emitters. The tracker has 3 cameras.
+   At least 3 out of 4 emitters must be visible from ALL 3 cameras.
+
+   Visibility is determined by the angle at the emitter (E)
+   between the emitter-to-camera vector (E->K) and the
+   emitter Z vector (E->F):
+
+   - angle at E = arccos((E->K . E->Z) / (|E->K| x |E->Z|))
+   - Default max angle: 40 degrees (user adjustable)
+
+   Note: The max angle tolerance should be validated
+   on the Munich demo cell.
 
 3. TRIANGLE CALIBRATION CRITERION
    The triangle formed by the 3 Star LED centers must have a
@@ -62,15 +60,25 @@ VALIDATION CRITERIA
 TRACKER
 -------
    Model : 920-0005
+   Cameras (local coordinates):
+   - Camera_1 : X=+524mm, Y=0mm,  Z=-1776mm (right)
+   - Camera_2 : X=0mm,    Y=0mm,  Z=-1776mm (center)
+   - Camera_3 : X=-525mm, Y=0mm,  Z=-1776mm (left)
+
    FOV zones (local Z):
-   - Near Field  : Z < -803mm
-   - Mid Field   : -803mm <= Z <= 0mm
-   - Far Field   : Z > 0mm up to +1200mm
+   - Near Field : Z < -803mm
+   - Mid Field  : -803mm <= Z <= 0mm (tracker origin)
+   - Far Field  : Z > 0mm up to +1200mm
 
 STAR
 ----
    Model  : 515-0139
    LED center offset from self origin: (0, 0, 4mm)
+   Emitters:
+   - Emitter_1 : X=-13.76mm, Y=0mm,    Z=2.05mm, Ry=-10 deg
+   - Emitter_2 : X=0mm,      Y=-13.76, Z=2.05mm, Rx=+10 deg
+   - Emitter_3 : X=+13.76mm, Y=0mm,    Z=2.05mm, Ry=+10 deg
+   - Emitter_4 : X=0mm,      Y=+13.76, Z=2.05mm, Rx=-10 deg
 
 DEVELOPED BY
 ------------
