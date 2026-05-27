@@ -1,5 +1,7 @@
 ﻿using System;
 using Tecnomatix.Engineering;
+using ISRA.Components.AccuSite.Stars;
+using ISRA.Components.AccuSite.Trackers;
 
 namespace ISRA.Calculations.AccuSite
 {
@@ -41,6 +43,126 @@ namespace ISRA.Calculations.AccuSite
             public string Label { get; set; }
         }
 
+        /// <summary>
+        /// Result of emitter visibility check from a single camera.
+        /// </summary>
+        public class EmitterVisibilityResult
+        {
+            public string EmitterName { get; set; }
+            public string CameraName { get; set; }
+            public double AngleDeg { get; set; }
+            public bool IsVisible { get; set; } // angle <= maxAngleDeg
+            public string Label { get; set; }
+        }
+
+        /// <summary>
+        /// Result of full star emitter visibility check
+        /// (all emitters x all cameras).
+        /// </summary>
+        public class StarEmitterVisibilityResult
+        {
+            public EmitterVisibilityResult[,] Results { get; set; }
+            // [emitterIndex, cameraIndex]
+            public bool[] EmitterVisibleFromAllCameras { get; set; }
+            public int VisibleEmitterCount { get; set; }
+            public bool IsValid { get; set; }
+            // IsValid = at least 3 emitters visible from all cameras
+        }
+
+        // ── Emitter visibility check ──────────────────────────────
+
+        /// <summary>
+        /// Calculates the angle at emitter E between:
+        /// - vector E->K (emitter to camera)
+        /// - emitter Z vector (E->F direction)
+        /// Max allowed angle defined by user (default 40 deg).
+        /// </summary>
+        public static double CalculateEmitterAngle(
+            TxVector emitterPos,
+            TxVector emitterZVector,
+            TxVector cameraPos)
+        {
+            // Vector E->K
+            TxVector EK = new TxVector(
+                cameraPos.X - emitterPos.X,
+                cameraPos.Y - emitterPos.Y,
+                cameraPos.Z - emitterPos.Z);
+
+            // Angle between EK and emitter Z vector at E
+            return AngleBetweenVectors(EK, emitterZVector);
+        }
+
+        /// <summary>
+        /// Checks visibility of all 4 emitters from all 3 cameras.
+        /// An emitter is visible from a camera if angle at E <= maxAngleDeg.
+        /// Star is valid if at least 3 emitters are visible from ALL cameras.
+        /// </summary>
+        public static StarEmitterVisibilityResult CheckStarEmitterVisibility(
+            ITxLocatableObject starLoc,
+            TxTransformation trackerWorld,
+            double maxAngleDeg = 40.0)
+        {
+            var emitters = star_515_0139.GetEmitters();
+            var cameras = tracker_920_0005.GetCameras();
+
+            int eCount = emitters.Length; // 4
+            int cCount = cameras.Length;  // 3
+
+            var results = new EmitterVisibilityResult[eCount, cCount];
+            var emitterVisibleFromAll = new bool[eCount];
+
+            for (int e = 0; e < eCount; e++)
+            {
+                // Get emitter world position and Z vector
+                TxVector emitterWorldPos = star_515_0139
+                    .GetEmitterWorldPosition(starLoc, emitters[e]);
+                TxVector emitterWorldZ = star_515_0139
+                    .GetEmitterWorldZVector(starLoc, emitters[e]);
+
+                bool visibleFromAll = true;
+
+                for (int c = 0; c < cCount; c++)
+                {
+                    // Get camera world position
+                    TxVector cameraWorldPos = tracker_920_0005
+                        .GetCameraWorldPosition(trackerWorld, cameras[c]);
+
+                    // Calculate angle at emitter E
+                    double angle = CalculateEmitterAngle(
+                        emitterWorldPos, emitterWorldZ, cameraWorldPos);
+
+                    bool visible = angle <= maxAngleDeg;
+                    if (!visible) visibleFromAll = false;
+
+                    results[e, c] = new EmitterVisibilityResult
+                    {
+                        EmitterName = emitters[e].Name,
+                        CameraName = cameras[c].Name,
+                        AngleDeg = angle,
+                        IsVisible = visible,
+                        Label = visible
+                            ? string.Format("OK ({0:F1} deg)", angle)
+                            : string.Format("NOK ({0:F1} deg)", angle)
+                    };
+                }
+
+                emitterVisibleFromAll[e] = visibleFromAll;
+            }
+
+            // Count emitters visible from ALL cameras
+            int visibleCount = 0;
+            foreach (bool v in emitterVisibleFromAll)
+                if (v) visibleCount++;
+
+            return new StarEmitterVisibilityResult
+            {
+                Results = results,
+                EmitterVisibleFromAllCameras = emitterVisibleFromAll,
+                VisibleEmitterCount = visibleCount,
+                IsValid = visibleCount >= 3
+            };
+        }
+
         // ── Star-Tracker angle check ──────────────────────────────
 
         /// <summary>
@@ -52,10 +174,8 @@ namespace ISRA.Calculations.AccuSite
             TxTransformation starWorldTransform,
             TxTransformation trackerWorldTransform)
         {
-            // Get star Z vector in world space
             TxVector starZ = GetZVector(starWorldTransform);
 
-            // Get tracker local axes in world space
             TxVector trackerX = new TxVector(
                 trackerWorldTransform[0, 0],
                 trackerWorldTransform[1, 0],
@@ -66,7 +186,6 @@ namespace ISRA.Calculations.AccuSite
                 trackerWorldTransform[2, 1]);
             TxVector trackerZ = GetZVector(trackerWorldTransform);
 
-            // Express star Z vector in tracker local coordinate system
             double localX = starZ.X * trackerX.X +
                             starZ.Y * trackerX.Y +
                             starZ.Z * trackerX.Z;
@@ -77,14 +196,10 @@ namespace ISRA.Calculations.AccuSite
                             starZ.Y * trackerZ.Y +
                             starZ.Z * trackerZ.Z;
 
-            // Star Z must point opposite to tracker Z (localZ must be negative)
             bool pointingCorrectly = localZ < 0;
 
-            // XZ plane deviation (rotation around Y axis): max 25 deg
             double angleXZ = Math.Atan2(Math.Abs(localX), Math.Abs(localZ))
                              * (180.0 / Math.PI);
-
-            // YZ plane deviation (rotation around X axis): max 40 deg
             double angleYZ = Math.Atan2(Math.Abs(localY), Math.Abs(localZ))
                              * (180.0 / Math.PI);
 
@@ -114,7 +229,6 @@ namespace ISRA.Calculations.AccuSite
         /// <summary>
         /// Calculates the height of a triangle formed by 3 points,
         /// dropped from the vertex opposite to the longest side.
-        /// All points must be in FOV local coordinate system.
         /// </summary>
         public static TriangleResult CalculateTriangleHeight(
             TxVector a, TxVector b, TxVector c)
@@ -155,8 +269,6 @@ namespace ISRA.Calculations.AccuSite
 
         /// <summary>
         /// Creates a temporary triangle visualization in PS from 3 world points.
-        /// Includes triangle sides and the height line (purple).
-        /// Returns the created component so it can be deleted later.
         /// </summary>
         public static TxComponent CreateTriangleVisualization(
             TxVector p1, TxVector p2, TxVector p3, bool isValid)
@@ -164,7 +276,7 @@ namespace ISRA.Calculations.AccuSite
             TxColor lineColor = isValid
                 ? new TxColor(0, 220, 0)
                 : new TxColor(220, 0, 0);
-            TxColor heightColor = new TxColor(180, 0, 255); // purple
+            TxColor heightColor = new TxColor(180, 0, 255);
 
             var compData = new TxLocalComponentCreationData("_LED_Triangle_Temp");
             TxComponent comp = TxApplication.ActiveDocument.PhysicalRoot
@@ -172,7 +284,6 @@ namespace ISRA.Calculations.AccuSite
 
             TxTransformation identity = new TxTransformation();
 
-            // Triangle sides
             var line1 = comp.CreateLine(
                 new TxLineCreationData("TriLine_1_2", identity, p1, p2));
             line1.Color = lineColor;
@@ -185,7 +296,6 @@ namespace ISRA.Calculations.AccuSite
                 new TxLineCreationData("TriLine_3_1", identity, p3, p1));
             line3.Color = lineColor;
 
-            // Height line
             double ab = Distance(p1, p2);
             double bc = Distance(p2, p3);
             double ca = Distance(p3, p1);
@@ -223,9 +333,6 @@ namespace ISRA.Calculations.AccuSite
 
         // ── Public helpers ────────────────────────────────────────
 
-        /// <summary>
-        /// Extracts the Z axis direction vector from a TxTransformation.
-        /// </summary>
         public static TxVector GetZVector(TxTransformation tx)
         {
             return new TxVector(tx[0, 2], tx[1, 2], tx[2, 2]);

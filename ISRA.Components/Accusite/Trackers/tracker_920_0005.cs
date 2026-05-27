@@ -4,7 +4,7 @@ using Tecnomatix.Engineering;
 namespace ISRA.Components.AccuSite.Trackers
 {
     /// <summary>
-    /// Defines the FOV geometry of tracker 920-0005.
+    /// Defines the FOV geometry and camera positions of tracker 920-0005.
     /// All coordinates are local to the tracker self origin.
     /// MiddleField = Z origin (Z=0)
     /// </summary>
@@ -12,25 +12,21 @@ namespace ISRA.Components.AccuSite.Trackers
     {
         // ── FOV field definitions (local coordinates in mm) ───────
 
-        // Near field plane (Z = -803)
         private const double NearZ = -803;
         private const double NearXMax = 278;
         private const double NearYMax = 265;
 
-        // Middle field plane (Z = 0 = tracker origin)
         private const double MidZ = 0;
         private const double MidXMax = 850;
         private const double MidYMax = 440;
 
-        // Far field plane (Z = +1200)
         private const double FarZ = 1200;
         private const double FarXMax = 1670;
         private const double FarYMax = 870;
 
         // ── Position zone constants ───────────────────────────────
-        public const double ZoneOptimalMin = 0;      // Z > 0 → Optimal
-        public const double ZoneWarnMin = -803;   // -803 < Z < 0 → Warning
-        // Z < -803 → NOK
+        public const double ZoneOptimalMin = 0;
+        public const double ZoneWarnMin = -803;
 
         // ── Position zone enum ────────────────────────────────────
         public enum PositionZone
@@ -40,7 +36,50 @@ namespace ISRA.Components.AccuSite.Trackers
             NOK       // Z < -803
         }
 
-        // ── Public methods ────────────────────────────────────────
+        // ── Camera definitions ────────────────────────────────────
+        // Position relative to tracker self origin (mm)
+
+        public class CameraData
+        {
+            public string Name { get; set; }
+            public TxVector Position { get; set; }
+        }
+
+        /// <summary>
+        /// Returns the 3 camera definitions in tracker local coordinate system.
+        /// </summary>
+        public static CameraData[] GetCameras()
+        {
+            return new CameraData[]
+            {
+                new CameraData
+                {
+                    Name     = "Camera_1",
+                    Position = new TxVector(524.06, 0.00, -1776.25)
+                },
+                new CameraData
+                {
+                    Name     = "Camera_2",
+                    Position = new TxVector(0.00, 0.00, -1776.50)
+                },
+                new CameraData
+                {
+                    Name     = "Camera_3",
+                    Position = new TxVector(-525.50, 0.00, -1776.25)
+                }
+            };
+        }
+
+        /// <summary>
+        /// Returns the world position of a specific camera.
+        /// </summary>
+        public static TxVector GetCameraWorldPosition(
+            TxTransformation trackerWorld, CameraData camera)
+        {
+            return trackerWorld.Transform(camera.Position);
+        }
+
+        // ── Position zone methods ─────────────────────────────────
 
         /// <summary>
         /// Returns the position zone of a star based on its
@@ -63,23 +102,14 @@ namespace ISRA.Components.AccuSite.Trackers
         {
             switch (GetPositionZone(localPoint))
             {
-                case PositionZone.Optimal: return "Optimal";
-                case PositionZone.Warning: return "Near Field";
+                case PositionZone.Optimal: return "OK Optimal";
+                case PositionZone.Warning: return "WARN Near Field";
                 default: return "NOK";
             }
         }
 
         /// <summary>
-        /// Transforms a world-space point into FOV local coordinate system.
-        /// </summary>
-        public TxVector ToLocalCoordinates(TxVector worldPoint,
-            TxTransformation fovWorldTransform)
-        {
-            return WorldToLocal(worldPoint, fovWorldTransform);
-        }
-
-        /// <summary>
-        /// Returns the name of the FOV zone at a given local Z.
+        /// Returns the name of the FOV zone at a given local point.
         /// </summary>
         public string GetZoneName(TxVector localPoint)
         {
@@ -90,20 +120,20 @@ namespace ISRA.Components.AccuSite.Trackers
         }
 
         /// <summary>
+        /// Transforms a world-space point into tracker local coordinate system.
+        /// </summary>
+        public TxVector ToLocalCoordinates(TxVector worldPoint,
+            TxTransformation trackerWorldTransform)
+        {
+            return trackerWorldTransform.Inverse.Transform(worldPoint);
+        }
+
+        /// <summary>
         /// Extracts the Z axis direction vector from a TxTransformation.
         /// </summary>
         public static TxVector GetZVector(TxTransformation tx)
         {
-            // Z column of rotation matrix = [2,0], [2,1], [2,2]
             return new TxVector(tx[0, 2], tx[1, 2], tx[2, 2]);
-        }
-
-        // ── Private helpers ───────────────────────────────────────
-
-        private TxVector WorldToLocal(TxVector worldPoint,
-            TxTransformation fovWorld)
-        {
-            return fovWorld.Inverse.Transform(worldPoint);
         }
     }
 }

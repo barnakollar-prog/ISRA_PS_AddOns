@@ -54,5 +54,11 @@
     <Compile Include="Accusite\GeometryCalculations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\ISRA.Components\ISRA.Components.csproj">
+      <Project>{006ca160-0ab3-4a01-8305-b7bf26f7847c}</Project>
+      <Name>ISRA.Components</Name>
+    </ProjectReference>
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

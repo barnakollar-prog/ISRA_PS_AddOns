@@ -1,11 +1,10 @@
-﻿using OfficeOpenXml.FormulaParsing.Excel.Functions.Math;
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Windows.Forms;
 using Tecnomatix.Engineering;
-using Tecnomatix.Engineering.DataTypes.Graphics;
 using Tecnomatix.Engineering.Ui;
+using Tecnomatix.Engineering.DataTypes.Graphics;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Components.AccuSite.Stars;
 using ISRA.Calculations.AccuSite;
@@ -44,10 +43,18 @@ namespace LedVisibilityAddon
         private Button btnExport;
         private Button btnHelp;
         private ListView lstResults;
+        private NumericUpDown nudMaxAngle;
+
+        // Tag constants for collapsible rows
+        private const string TAG_EMITTER_DETAIL = "emitter_detail";
+        private const string TAG_EMITTER_SUMMARY = "emitter_summary";
+        private const string TAG_TRIANGLE_DETAIL = "triangle_detail";
+        private const string TAG_TRIANGLE_SUMMARY = "triangle_summary";
 
         private readonly List<ITxDisplayableObject> _coloredObjects
             = new List<ITxDisplayableObject>();
         private TxComponent _triangleComponent = null;
+        private TxComponent _emitterComponent = null;
         private readonly tracker_920_0005 _trackerFov = new tracker_920_0005();
 
         private static readonly TxColor ColorHighlight = new TxColor(255, 200, 0);
@@ -68,10 +75,10 @@ namespace LedVisibilityAddon
         {
             this.Text = "Star Visibility Analyzer";
             this.Width = 680;
-            this.Height = 720;
+            this.Height = 780;
             this.FormBorderStyle = FormBorderStyle.Sizable;
             this.MaximizeBox = true;
-            this.MinimumSize = new Size(500, 620);
+            this.MinimumSize = new Size(500, 680);
             this.StartPosition = FormStartPosition.CenterScreen;
 
             int lx = 10;
@@ -131,7 +138,6 @@ namespace LedVisibilityAddon
             };
             int sy = 18;
 
-            // Star 1
             grpStars.Controls.Add(new Label
             {
                 Text = "Star 1:",
@@ -161,7 +167,6 @@ namespace LedVisibilityAddon
             grpStars.Controls.Add(pickerStar1);
             sy += 32;
 
-            // Star 2
             grpStars.Controls.Add(new Label
             {
                 Text = "Star 2:",
@@ -191,7 +196,6 @@ namespace LedVisibilityAddon
             grpStars.Controls.Add(pickerStar2);
             sy += 32;
 
-            // Star 3
             grpStars.Controls.Add(new Label
             {
                 Text = "Star 3:",
@@ -221,6 +225,39 @@ namespace LedVisibilityAddon
             grpStars.Controls.Add(pickerStar3);
             y += 128;
 
+            // ── Settings ──────────────────────────────────────────
+            var grpSettings = new GroupBox
+            {
+                Text = "Settings",
+                Left = lx,
+                Top = y,
+                Width = 645,
+                Height = 48,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpSettings.Controls.Add(new Label
+            {
+                Text = "Max emitter angle (deg):",
+                Left = 8,
+                Top = 16,
+                Width = 160,
+                Height = rowH,
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            nudMaxAngle = new NumericUpDown
+            {
+                Left = 172,
+                Top = 16,
+                Width = 70,
+                Height = rowH,
+                Minimum = 1,
+                Maximum = 90,
+                Value = 40,
+                DecimalPlaces = 0
+            };
+            grpSettings.Controls.Add(nudMaxAngle);
+            y += 58;
+
             // ── Analyze button ────────────────────────────────────
             btnAnalyze = new Button
             {
@@ -238,27 +275,24 @@ namespace LedVisibilityAddon
             btnAnalyze.Click += OnAnalyze;
             y += 44;
 
-
             // ── Results ───────────────────────────────────────────
             var lblRes = new Label
             {
-                Text = "Results:",
+                Text = "Results: (double-click [+]/[-] to expand/collapse)",
                 Left = lx,
                 Top = y,
-                Width = 100,
+                Width = 400,
                 Height = 20,
                 Font = new Font("Segoe UI", 9, FontStyle.Bold)
             };
             y += 22;
 
             lstResults = new ListView
- 
-
             {
                 Left = lx,
                 Top = y,
                 Width = 645,
-                Height = 220,
+                Height = 260,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
@@ -266,15 +300,14 @@ namespace LedVisibilityAddon
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
                          AnchorStyles.Right | AnchorStyles.Bottom
             };
-            lstResults.Columns.Add("Object", 160);
+            lstResults.Columns.Add("Object", 200);
             lstResults.Columns.Add("Local X", 65);
             lstResults.Columns.Add("Local Y", 65);
             lstResults.Columns.Add("Local Z", 65);
-            lstResults.Columns.Add("Zone / Note", 100);
-            lstResults.Columns.Add("Orientation", 95);
-            lstResults.Columns.Add("Position", 95);
-            lstResults.AutoResizeColumns(ColumnHeaderAutoResizeStyle.HeaderSize);
-            y += 228;
+            lstResults.Columns.Add("Note", 100);
+            lstResults.Columns.Add("Status", 130);
+            lstResults.DoubleClick += OnListDoubleClick;
+            y += 268;
 
             // ── Export button ─────────────────────────────────────
             btnExport = new Button
@@ -311,11 +344,53 @@ namespace LedVisibilityAddon
 
             this.Controls.Add(grpTracker);
             this.Controls.Add(grpStars);
+            this.Controls.Add(grpSettings);
             this.Controls.Add(btnAnalyze);
             this.Controls.Add(lblRes);
             this.Controls.Add(lstResults);
             this.Controls.Add(btnExport);
             this.Controls.Add(btnHelp);
+        }
+
+        // ── Double click to expand/collapse ───────────────────────
+        private void OnListDoubleClick(object sender, EventArgs e)
+        {
+            if (lstResults.SelectedItems.Count == 0) return;
+            var selected = lstResults.SelectedItems[0];
+
+            // Check if this is a collapsible summary row
+            var ct = selected.Tag as CollapsibleTag;
+            if (ct == null) return;
+
+            int summaryIndex = lstResults.Items.IndexOf(selected);
+            bool isExpanded = selected.Text.StartsWith("[-]");
+
+            if (isExpanded)
+            {
+                // Collapse - remove detail rows after summary
+                selected.Text = selected.Text.Replace("[-]", "[+]");
+                int removeFrom = summaryIndex + 1;
+                while (removeFrom < lstResults.Items.Count)
+                {
+                    var item = lstResults.Items[removeFrom];
+                    string itemTag = item.Tag as string;
+                    if (itemTag == TAG_EMITTER_DETAIL || itemTag == TAG_TRIANGLE_DETAIL)
+                        lstResults.Items.RemoveAt(removeFrom);
+                    else
+                        break;
+                }
+            }
+            else
+            {
+                // Expand - insert cloned detail rows
+                selected.Text = selected.Text.Replace("[+]", "[-]");
+                int insertAt = summaryIndex + 1;
+                foreach (var detail in ct.DetailItems)
+                {
+                    var clone = (ListViewItem)detail.Clone();
+                    lstResults.Items.Insert(insertAt++, clone);
+                }
+            }
         }
 
         // ── Analyze ───────────────────────────────────────────────
@@ -332,13 +407,10 @@ namespace LedVisibilityAddon
             }
 
             var trackerLoc = tracker as ITxLocatableObject;
-            if (trackerLoc == null)
-            {
-                MessageBox.Show("Tracker is not locatable.", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
+            if (trackerLoc == null) return;
+
             TxTransformation trackerWorld = trackerLoc.AbsoluteLocation;
+            double maxAngle = (double)nudMaxAngle.Value;
 
             var starPickers = new[] { pickerStar1, pickerStar2, pickerStar3 };
             bool anyResult = false;
@@ -346,7 +418,9 @@ namespace LedVisibilityAddon
             var localPositions = new TxVector[3];
             var worldPositions = new TxVector[3];
 
-            // ── Per star analysis ─────────────────────────────────
+            GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
+            DeleteEmitterVisualization();
+
             for (int i = 0; i < starPickers.Length; i++)
             {
                 var starObj = starPickers[i].Object;
@@ -356,23 +430,22 @@ namespace LedVisibilityAddon
                 var starLoc = starObj as ITxLocatableObject;
                 if (starLoc == null) continue;
 
-                TxTransformation starWorld = starLoc.AbsoluteLocation;
                 TxVector ledWorldPos = star_515_0139.GetLedWorldPosition(starLoc);
-                TxVector localPt = _trackerFov.ToLocalCoordinates(ledWorldPos, trackerWorld);
+                TxVector localPt = _trackerFov.ToLocalCoordinates(
+                    ledWorldPos, trackerWorld);
                 localPositions[i] = localPt;
                 worldPositions[i] = ledWorldPos;
 
-                // Criterion 1: Z vector orientation
-                var angleResult = GeometryCalculations.CalculateStarTrackerAngle(
-                    starWorld, trackerWorld);
-
-
-                // Criterion 2: Position zone
+                // Criterion 1: Position zone
                 var zone = _trackerFov.GetPositionZone(localPt);
                 string zoneLabel = _trackerFov.GetPositionZoneLabel(localPt);
 
-                bool starOK = angleResult.IsValid &&
-                    zone != tracker_920_0005.PositionZone.NOK;
+                // Criterion 2: Emitter visibility
+                var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
+                    starLoc, trackerWorld, maxAngle);
+
+                bool starOK = zone != tracker_920_0005.PositionZone.NOK &&
+                              emitterResult.IsValid;
                 if (!starOK) allOK = false;
 
                 // Color in PS
@@ -382,8 +455,8 @@ namespace LedVisibilityAddon
                     try
                     {
                         TxColor col;
-                        if (!angleResult.IsValid ||
-                            zone == tracker_920_0005.PositionZone.NOK)
+                        if (zone == tracker_920_0005.PositionZone.NOK ||
+                            !emitterResult.IsValid)
                             col = ColorNOK;
                         else if (zone == tracker_920_0005.PositionZone.Warning)
                             col = ColorWarn;
@@ -402,50 +475,84 @@ namespace LedVisibilityAddon
                     ? "..." + starObj.Name.Substring(starObj.Name.Length - 17)
                     : starObj.Name;
 
-                // Star header row
+                // ── Star header row ───────────────────────────────
                 var headerItem = new ListViewItem(shortName);
                 headerItem.SubItems.Add(string.Format("{0:F0}", localPt.X));
                 headerItem.SubItems.Add(string.Format("{0:F0}", localPt.Y));
                 headerItem.SubItems.Add(string.Format("{0:F0}", localPt.Z));
                 headerItem.SubItems.Add(_trackerFov.GetZoneName(localPt));
-                headerItem.SubItems.Add("");
                 headerItem.SubItems.Add(zoneLabel);
-
-                if (!angleResult.IsValid ||
-                    zone == tracker_920_0005.PositionZone.NOK)
-                    headerItem.BackColor = Color.LightCoral;
-                else if (zone == tracker_920_0005.PositionZone.Warning)
-                    headerItem.BackColor = Color.LightYellow;
-                else
-                    headerItem.BackColor = Color.LightGreen;
-
+                headerItem.BackColor = zone == tracker_920_0005.PositionZone.NOK
+                    ? Color.LightCoral
+                    : zone == tracker_920_0005.PositionZone.Warning
+                        ? Color.LightYellow
+                        : Color.LightGreen;
                 lstResults.Items.Add(headerItem);
 
-                // Orientation XZ row
-                var xzItem = new ListViewItem("  Orient. XZ (Y-rot)");
-                xzItem.SubItems.Add("");
-                xzItem.SubItems.Add("");
-                xzItem.SubItems.Add("");
-                xzItem.SubItems.Add("Max: 25 deg");
-                xzItem.SubItems.Add(angleResult.LabelXZ);
-                xzItem.SubItems.Add("");
-                xzItem.BackColor = angleResult.IsValidXZ
-                    ? Color.FromArgb(220, 255, 220)
-                    : Color.FromArgb(255, 220, 220);
-                lstResults.Items.Add(xzItem);
+                // ── Emitter summary row (collapsible) ─────────────
+                var emitters = star_515_0139.GetEmitters();
+                var cameras = tracker_920_0005.GetCameras();
 
-                // Orientation YZ row
-                var yzItem = new ListViewItem("  Orient. YZ (X-rot)");
-                yzItem.SubItems.Add("");
-                yzItem.SubItems.Add("");
-                yzItem.SubItems.Add("");
-                yzItem.SubItems.Add("Max: 40 deg");
-                yzItem.SubItems.Add(angleResult.LabelYZ);
-                yzItem.SubItems.Add("");
-                yzItem.BackColor = angleResult.IsValidYZ
+                string emitterSummaryText = string.Format(
+                    "{0}  Emitters: {1}/4 visible (min 3)",
+                    emitterResult.IsValid ? "[+]" : "[-]",
+                    emitterResult.VisibleEmitterCount);
+
+                // Build detail rows
+                var detailItems = new List<ListViewItem>();
+                for (int e2 = 0; e2 < emitters.Length; e2++)
+                {
+                    for (int c = 0; c < cameras.Length; c++)
+                    {
+                        var res = emitterResult.Results[e2, c];
+                        var detailItem = new ListViewItem(
+                            string.Format("    {0} / {1}",
+                                emitters[e2].Name, cameras[c].Name));
+                        detailItem.SubItems.Add("");
+                        detailItem.SubItems.Add("");
+                        detailItem.SubItems.Add("");
+                        detailItem.SubItems.Add(string.Format(
+                            "Max: {0} deg", maxAngle));
+                        detailItem.SubItems.Add(res.Label);
+                        detailItem.Tag = TAG_EMITTER_DETAIL;
+                        detailItem.BackColor = res.IsVisible
+                            ? Color.FromArgb(235, 255, 235)
+                            : Color.FromArgb(255, 235, 235);
+                        detailItems.Add(detailItem);
+                    }
+                }
+
+                var emitterSummaryItem = new ListViewItem(emitterSummaryText);
+                emitterSummaryItem.SubItems.Add("");
+                emitterSummaryItem.SubItems.Add("");
+                emitterSummaryItem.SubItems.Add("");
+                emitterSummaryItem.SubItems.Add(string.Format(
+                    "E:{0}{1}{2}{3}",
+                    emitterResult.EmitterVisibleFromAllCameras[0] ? "1" : "-",
+                    emitterResult.EmitterVisibleFromAllCameras[1] ? "2" : "-",
+                    emitterResult.EmitterVisibleFromAllCameras[2] ? "3" : "-",
+                    emitterResult.EmitterVisibleFromAllCameras[3] ? "4" : "-"));
+                emitterSummaryItem.SubItems.Add(
+                    emitterResult.IsValid ? "OK" : "NOK");
+                emitterSummaryItem.BackColor = emitterResult.IsValid
                     ? Color.FromArgb(220, 255, 220)
                     : Color.FromArgb(255, 220, 220);
-                lstResults.Items.Add(yzItem);
+                emitterSummaryItem.Tag = new CollapsibleTag
+                {
+                    TagType = TAG_EMITTER_SUMMARY,
+                    DetailItems = detailItems
+                };
+
+                lstResults.Items.Add(emitterSummaryItem);
+
+                // If NOK expand immediately
+                if (!emitterResult.IsValid)
+                {
+                    foreach (var detail in detailItems)
+                        lstResults.Items.Add(detail);
+                    emitterSummaryItem.Text = emitterSummaryItem.Text
+                        .Replace("[+]", "[-]");
+                }
             }
 
             if (!anyResult)
@@ -455,7 +562,7 @@ namespace LedVisibilityAddon
                 return;
             }
 
-            // ── Triangle calculation ──────────────────────────────
+            // ── Triangle ──────────────────────────────────────────
             GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
 
             if (allOK &&
@@ -466,39 +573,67 @@ namespace LedVisibilityAddon
                 var tri = GeometryCalculations.CalculateTriangleHeight(
                     localPositions[0], localPositions[1], localPositions[2]);
 
-                var sep = new ListViewItem("--- Triangle Analysis ---");
-                for (int i = 0; i < 6; i++) sep.SubItems.Add("");
-                sep.BackColor = Color.LightGray;
-                lstResults.Items.Add(sep);
+                // Triangle summary row
+                string triSummaryText = string.Format(
+                    "{0}  Triangle Height: {1:F0} mm (min 500)",
+                    tri.IsValid ? "[+]" : "[-]",
+                    tri.Height);
 
-                AddTriRow("Side Star1-Star2", tri.SideAB, "mm", "");
-                AddTriRow("Side Star2-Star3", tri.SideBC, "mm", "");
-                AddTriRow("Side Star3-Star1", tri.SideCA, "mm", "");
-                AddTriRow("Longest side", tri.LongestSide, "mm",
-                    tri.LongestSideName, Color.LightYellow);
+                // Triangle detail rows
+                var triDetails = new List<ListViewItem>();
+                var triRows = new[]
+                {
+                    new { Label = "Side Star1-Star2", Value = tri.SideAB },
+                    new { Label = "Side Star2-Star3", Value = tri.SideBC },
+                    new { Label = "Side Star3-Star1", Value = tri.SideCA },
+                    new { Label = "Longest side",     Value = tri.LongestSide },
+                };
+                foreach (var tr in triRows)
+                {
+                    var di = new ListViewItem("  " + tr.Label);
+                    di.SubItems.Add(string.Format("{0:F0}", tr.Value));
+                    di.SubItems.Add("mm");
+                    di.SubItems.Add(""); di.SubItems.Add(""); di.SubItems.Add("");
+                    di.Tag = TAG_TRIANGLE_DETAIL;
+                    di.BackColor = Color.FromArgb(245, 245, 245);
+                    triDetails.Add(di);
+                }
 
-                var heightItem = new ListViewItem("Triangle Height");
-                heightItem.SubItems.Add(string.Format("{0:F0}", tri.Height));
-                heightItem.SubItems.Add("mm");
-                heightItem.SubItems.Add("");
-                heightItem.SubItems.Add("Min: 500 mm");
-                heightItem.SubItems.Add(tri.IsValid ? "OK" : "FAIL");
-                heightItem.SubItems.Add("");
-                heightItem.BackColor = tri.IsValid
+                var triSummaryItem = new ListViewItem(triSummaryText);
+                triSummaryItem.SubItems.Add(""); triSummaryItem.SubItems.Add("");
+                triSummaryItem.SubItems.Add(""); triSummaryItem.SubItems.Add("");
+                triSummaryItem.SubItems.Add(tri.IsValid ? "OK" : "FAIL");
+                triSummaryItem.BackColor = tri.IsValid
                     ? Color.FromArgb(0, 220, 0)
                     : Color.LightCoral;
-                heightItem.ForeColor = tri.IsValid ? Color.White : Color.Black;
-                lstResults.Items.Add(heightItem);
+                triSummaryItem.ForeColor = tri.IsValid ? Color.White : Color.Black;
+                triSummaryItem.Tag = new CollapsibleTag
+                {
+                    TagType = TAG_TRIANGLE_SUMMARY,
+                    DetailItems = triDetails
+                };
+                lstResults.Items.Add(triSummaryItem);
 
+                // If FAIL expand immediately
+                if (!tri.IsValid)
+                {
+                    foreach (var detail in triDetails)
+                        lstResults.Items.Add(detail);
+                    triSummaryItem.Text = triSummaryItem.Text
+                        .Replace("[+]", "[-]");
+                }
+
+                // PS visualization
                 try
                 {
                     if (worldPositions[0] != null &&
                         worldPositions[1] != null &&
                         worldPositions[2] != null)
                     {
-                        _triangleComponent = GeometryCalculations.CreateTriangleVisualization(
-                            worldPositions[0], worldPositions[1], worldPositions[2],
-                            tri.IsValid);
+                        _triangleComponent = GeometryCalculations
+                            .CreateTriangleVisualization(
+                                worldPositions[0], worldPositions[1],
+                                worldPositions[2], tri.IsValid);
                     }
                 }
                 catch (Exception ex)
@@ -509,35 +644,28 @@ namespace LedVisibilityAddon
             }
             else if (anyResult && !allOK)
             {
-                var sep = new ListViewItem("--- Triangle Analysis ---");
-                for (int i = 0; i < 6; i++) sep.SubItems.Add("");
-                sep.BackColor = Color.LightGray;
-                lstResults.Items.Add(sep);
-
-                var skip = new ListViewItem("Triangle not calculated");
+                var skip = new ListViewItem("Triangle: not calculated");
                 skip.SubItems.Add(""); skip.SubItems.Add("");
                 skip.SubItems.Add(""); skip.SubItems.Add("");
                 skip.SubItems.Add("Not all stars OK");
-                skip.SubItems.Add("");
                 skip.BackColor = Color.LightYellow;
                 lstResults.Items.Add(skip);
             }
-            foreach(ColumnHeader col in lstResults.Columns)
-            col.Width = -2;
+
+            foreach (ColumnHeader col in lstResults.Columns)
+                col.Width = -2;
         }
 
-        private void AddTriRow(string label, double value, string unit,
-            string note, Color? bg = null)
+        // ── Emitter visualization ─────────────────────────────────
+        private void DeleteEmitterVisualization()
         {
-            var item = new ListViewItem(label);
-            item.SubItems.Add(string.Format("{0:F0}", value));
-            item.SubItems.Add(unit);
-            item.SubItems.Add("");
-            item.SubItems.Add(note);
-            item.SubItems.Add("");
-            item.SubItems.Add("");
-            if (bg.HasValue) item.BackColor = bg.Value;
-            lstResults.Items.Add(item);
+            try
+            {
+                if (_emitterComponent != null && _emitterComponent.IsValid())
+                    _emitterComponent.Delete();
+                _emitterComponent = null;
+            }
+            catch { }
         }
 
         // ── Export ────────────────────────────────────────────────
@@ -568,14 +696,15 @@ namespace LedVisibilityAddon
 
                 TxTransformation trackerWorld = trackerLoc.AbsoluteLocation;
                 TxVector ledWorldPos = star_515_0139.GetLedWorldPosition(starLoc);
-                TxVector localPt = _trackerFov.ToLocalCoordinates(ledWorldPos, trackerWorld);
+                TxVector localPt = _trackerFov.ToLocalCoordinates(
+                    ledWorldPos, trackerWorld);
 
-                var angleResult = GeometryCalculations.CalculateStarTrackerAngle(
-                    starLoc.AbsoluteLocation, trackerWorld);
                 var zone = _trackerFov.GetPositionZone(localPt);
+                var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
+                    starLoc, trackerWorld, (double)nudMaxAngle.Value);
 
-                bool ok = angleResult.IsValid &&
-                    zone != tracker_920_0005.PositionZone.NOK;
+                bool ok = zone != tracker_920_0005.PositionZone.NOK &&
+                          emitterResult.IsValid;
 
                 rows.Add(new ExportRow
                 {
@@ -630,6 +759,7 @@ namespace LedVisibilityAddon
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
             GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
+            DeleteEmitterVisualization();
             foreach (var obj in _coloredObjects)
             {
                 try { obj.RestoreColor(); }
@@ -639,5 +769,14 @@ namespace LedVisibilityAddon
             try { TxApplication.RefreshDisplay(); }
             catch { }
         }
+    }
+
+    /// <summary>
+    /// Helper class to store collapsible row data.
+    /// </summary>
+    public class CollapsibleTag
+    {
+        public string TagType { get; set; }
+        public List<ListViewItem> DetailItems { get; set; }
     }
 }
