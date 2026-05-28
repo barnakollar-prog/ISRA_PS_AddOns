@@ -43,6 +43,7 @@ namespace LedVisibilityAddon
         private Button btnExport;
         private Button btnHelp;
         private ListView lstResults;
+        private List<TxComponent> _cylinderComponents = new List<TxComponent>();
         private NumericUpDown nudMaxAngle;
 
         // Tag constants for collapsible rows
@@ -420,6 +421,7 @@ namespace LedVisibilityAddon
 
             GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
             DeleteEmitterVisualization();
+            CollisionCheck.DeleteCylinderVisualizations(_cylinderComponents);
 
             for (int i = 0; i < starPickers.Length; i++)
             {
@@ -444,10 +446,13 @@ namespace LedVisibilityAddon
                 var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
                     starLoc, trackerWorld, maxAngle);
 
-                bool starOK = zone != tracker_920_0005.PositionZone.NOK &&
-                              emitterResult.IsValid;
-                if (!starOK) allOK = false;
+                // Criterion 3: Line of sight check
+                var losResult = CollisionCheck.CheckLineOfSight(
+                    starLoc, trackerWorld, _cylinderComponents);
 
+                bool starOK = zone != tracker_920_0005.PositionZone.NOK &&
+                              emitterResult.IsValid &&
+                              losResult.IsValid;
                 // Color in PS
                 var displayable = starObj as ITxDisplayableObject;
                 if (displayable != null)
@@ -497,7 +502,47 @@ namespace LedVisibilityAddon
                     "{0}  Emitters: {1}/4 visible (min 3)",
                     emitterResult.IsValid ? "[+]" : "[-]",
                     emitterResult.VisibleEmitterCount);
+                // Line of sight summary row
+                var losSummaryText = string.Format(
+                    "{0}  Line of Sight: {1}",
+                    losResult.IsValid ? "[+]" : "[-]",
+                    losResult.Label);
 
+                var losDetails = new List<ListViewItem>();
+                foreach (var camRes in losResult.CameraResults)
+                {
+                    var di = new ListViewItem(
+                        string.Format("    {0}", camRes.CameraName));
+                    di.SubItems.Add(""); di.SubItems.Add("");
+                    di.SubItems.Add(""); di.SubItems.Add("");
+                    di.SubItems.Add(camRes.Label);
+                    di.Tag = TAG_EMITTER_DETAIL;
+                    di.BackColor = camRes.IsBlocked
+                        ? Color.FromArgb(255, 235, 235)
+                        : Color.FromArgb(235, 255, 235);
+                    losDetails.Add(di);
+                }
+
+                var losSummaryItem = new ListViewItem(losSummaryText);
+                losSummaryItem.SubItems.Add(""); losSummaryItem.SubItems.Add("");
+                losSummaryItem.SubItems.Add(""); losSummaryItem.SubItems.Add("");
+                losSummaryItem.SubItems.Add(losResult.IsValid ? "OK" : "BLOCKED");
+                losSummaryItem.BackColor = losResult.IsValid
+                    ? Color.FromArgb(220, 255, 220)
+                    : Color.FromArgb(255, 220, 220);
+                losSummaryItem.Tag = new CollapsibleTag
+                {
+                    TagType = TAG_EMITTER_DETAIL,
+                    DetailItems = losDetails
+                };
+                lstResults.Items.Add(losSummaryItem);
+
+                if (!losResult.IsValid)
+                {
+                    foreach (var detail in losDetails)
+                        lstResults.Items.Add(detail);
+                    losSummaryItem.Text = losSummaryItem.Text.Replace("[+]", "[-]");
+                }
                 // Build detail rows
                 var detailItems = new List<ListViewItem>();
                 for (int e2 = 0; e2 < emitters.Length; e2++)
@@ -760,6 +805,7 @@ namespace LedVisibilityAddon
         {
             GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
             DeleteEmitterVisualization();
+            CollisionCheck.DeleteCylinderVisualizations(_cylinderComponents);
             foreach (var obj in _coloredObjects)
             {
                 try { obj.RestoreColor(); }

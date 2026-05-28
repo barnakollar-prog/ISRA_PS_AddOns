@@ -25,6 +25,9 @@ Process Simulate Add-On for AccuSite Star Validation
 VALIDATION CRITERIA
 -------------------
 
+VALIDATION CRITERIA
+-------------------
+
 1. STAR POSITION ZONE
    Star LED center position is evaluated in the Tracker local
    coordinate system (MiddleField = Z origin):
@@ -47,7 +50,21 @@ VALIDATION CRITERIA
    Note: The max angle tolerance should be validated
    on the Munich demo cell.
 
-3. TRIANGLE CALIBRATION CRITERION
+3. LINE OF SIGHT CHECK
+   For each star, a cylinder (radius 5mm) is created from each
+   tracker camera to the star self origin (+10mm Z offset).
+   If any cylinder collides with scene geometry, the star is
+   marked as BLOCKED.
+
+   IMPORTANT: The Tracker Design FOV entity must be hidden
+   before running the analysis, otherwise false BLOCKED
+   results may occur.
+
+   Cylinder color:
+   - Green     : line of sight clear
+   - Red       : line of sight blocked
+
+4. TRIANGLE CALIBRATION CRITERION
    The triangle formed by the 3 Star LED centers must have a
    minimum height of 500mm (perpendicular from apex to longest side).
 
@@ -55,7 +72,7 @@ VALIDATION CRITERIA
    - FAIL : Height < 500mm
 
    Triangle analysis is only performed if all 3 stars pass
-   criteria 1 and 2.
+   criteria 1, 2 and 3.
 
 TRACKER
 -------
