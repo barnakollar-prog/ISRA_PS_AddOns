@@ -29,16 +29,38 @@ namespace ISRA.Calculations.TempComp
         // ── PS API helpers ────────────────────────────────────────
 
         /// <summary>
-        /// Reads all robot poses from a robotic program.
+        /// Reads all robot poses from a WeldOperation path.
+        /// Robot is extracted automatically from the path.
         /// </summary>
-        public static List<RobotPose> ReadPosesFromProgram(
-            TxRoboticProgram program, TxRobot robot)
+        public static List<RobotPose> ReadPosesFromProgram(TxWeldOperation program)
         {
             var poses = new List<RobotPose>();
 
-            var elements = program.GetDirectChildElements(
-                new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
+            // Try to get robot from path
+            TxRobot robot = null;
+            try
+            {
+                robot = program.Robot as TxRobot;
+            }
+            catch { }
 
+            // If not found on path, try parent operation
+            if (robot == null)
+            {
+                try
+                {
+                    var parent = program.Collection as TxWeldOperation;
+                    if (parent != null)
+                        robot = parent.Robot as TxRobot;
+                }
+                catch { }
+            }
+
+            if (robot == null) return poses;
+
+            // Get all location operations
+            var elements = program.GetAllDescendants(
+                new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
             if (elements == null) return poses;
 
             foreach (ITxObject obj in elements)
