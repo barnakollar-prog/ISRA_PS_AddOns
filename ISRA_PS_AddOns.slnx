@@ -5,4 +5,5 @@
   <Project Path="ISRA.Calculations/ISRA.Calculations.csproj" Id="e177cde4-a79a-4a25-aac0-5ace4f2e8f2a" />
   <Project Path="ISRA.Components/ISRA.Components.csproj" Id="006ca160-0ab3-4a01-8305-b7bf26f7847c" />
   <Project Path="LedVisibilityAddon/LedVisibilityAddon.csproj" Id="79a98015-4f7a-4311-8748-1ee76feb5147" />
+  <Project Path="TempCompAddon/TempCompAddon.csproj" Id="70a9cc5f-4f46-4ac3-ba54-d779b57b8875" />
 </Solution>

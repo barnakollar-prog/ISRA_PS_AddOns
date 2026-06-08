@@ -1,0 +1,8 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<CommandList>
+	<Command>
+		<Name>TempCompAddon</Name>
+		<Assembly>TempCompAddon.dll</Assembly>
+		<Class>TempCompAddon.TempCompCommand</Class>
+	</Command>
+</CommandList>

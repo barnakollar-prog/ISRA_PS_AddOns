@@ -62,5 +62,4 @@ Only evaluated if all 3 stars pass criteria 1, 2 and 3.
 
 ## Important Notes
 - Before running analysis: hide the Tracker Design FOV entity in PS
-- Star orientation tolerances (XZ: +-25 deg, YZ: +-40 deg) to be validated on Munich demo cell
 - Emitter visibility max angle (default 40 deg) to be validated on Munich demo cell
