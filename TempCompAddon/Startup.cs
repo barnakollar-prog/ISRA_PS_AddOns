@@ -42,6 +42,9 @@ namespace TempCompAddon
         private Button btnClearTempCompPaths;
         private NumericUpDown nudStepSize;
         private Button btnAnalyze;
+        private RadioButton rbFanuc;
+        private RadioButton rbKuka;
+        private RadioButton rbAbb;
 
         // Tab results
         private ListView lstValidation;
@@ -84,7 +87,7 @@ namespace TempCompAddon
                 Left = lx,
                 Top = y,
                 Width = 765,
-                Height = 58,
+                Height = 82,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             grpRobot.Controls.Add(new Label
@@ -108,9 +111,18 @@ namespace TempCompAddon
                 ListenToPick = true,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
+            pickerRobot.Picked += OnRobotPicked;
             grpRobot.Controls.Add(pickerRobot);
+
+            rbFanuc = new RadioButton { Text = "Fanuc", Left = 82, Top = 50, Width = 80, Height = 20, Checked = true };
+            rbKuka = new RadioButton { Text = "Kuka", Left = 170, Top = 50, Width = 80, Height = 20 };
+            rbAbb = new RadioButton { Text = "ABB", Left = 255, Top = 50, Width = 80, Height = 20 };
+            grpRobot.Controls.Add(rbFanuc);
+            grpRobot.Controls.Add(rbKuka);
+            grpRobot.Controls.Add(rbAbb);
+
             this.Controls.Add(grpRobot);
-            y += 68;
+            y += 92;
 
             // ── Bodypart paths ────────────────────────────────────
             var grpBody = new GroupBox
@@ -604,7 +616,20 @@ namespace TempCompAddon
             item.BackColor = Color.FromArgb(245, 245, 245);
             lstValidation.Items.Add(item);
         }
+        private void OnRobotPicked(object sender, TxObjEditBoxCtrl_PickedEventArgs e)
+        {
+            var robot = e.Object as TxRobot;
+            if (robot == null) return;
 
+            string name = robot.Name.ToLower();
+
+            if (name.Contains("kuka"))
+                rbKuka.Checked = true;
+            else if (name.Contains("fanuc"))
+                rbFanuc.Checked = true;
+            else if (name.Contains("abb"))
+                rbAbb.Checked = true;
+        }
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {
             try
