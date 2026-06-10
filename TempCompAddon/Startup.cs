@@ -13,6 +13,16 @@ namespace TempCompAddon
         public override string Category { get { return StringTable.CATEGORY; } }
         public override string Name { get { return StringTable.NAME; } }
 
+        public override string Bitmap
+        {
+            get { return "temp_comp_add_on_16x16.bmp"; }
+        }
+
+        public override string LargeBitmap
+        {
+            get { return "temp_comp_add_on_32x32.png"; }
+        }
+
         public override void Execute(object cmdParams)
         {
             var form = new TempCompForm();

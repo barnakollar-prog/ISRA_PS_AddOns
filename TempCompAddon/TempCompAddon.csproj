@@ -72,6 +72,8 @@
   </ItemGroup>
   <ItemGroup>
     <Content Include="TempCompAddon.xml" />
+    <EmbeddedResource Include="temp_comp_add_on_16x16.bmp" />
+    <EmbeddedResource Include="temp_comp_add_on_32x32.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="StringTable.resx">
