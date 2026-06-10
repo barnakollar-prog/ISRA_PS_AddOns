@@ -321,11 +321,11 @@ namespace TempCompAddon
                 GridLines = true,
                 Font = new Font("Consolas", 9)
             };
-            lstValidation.Columns.Add("Criterion", 220);
-            lstValidation.Columns.Add("J2", 110);
-            lstValidation.Columns.Add("J3", 110);
-            lstValidation.Columns.Add("Details", 200);
-            lstValidation.Columns.Add("Status", 80);
+            lstValidation.Columns.Add("Criterion", 180);
+            lstValidation.Columns.Add("Bodypart", 120);
+            lstValidation.Columns.Add("Temp Comp", 180);
+            lstValidation.Columns.Add("Details", 180);
+            lstValidation.Columns.Add("Status", 70);
             tabValidation.Controls.Add(lstValidation);
 
             // Tab 2: Nearest TC
@@ -461,6 +461,11 @@ namespace TempCompAddon
                 return;
             }
 
+            // Robot type
+            TempCompCalculations.RobotType robotType = TempCompCalculations.RobotType.Fanuc;
+            if (rbKuka.Checked) robotType = TempCompCalculations.RobotType.Kuka;
+            else if (rbAbb.Checked) robotType = TempCompCalculations.RobotType.Abb;
+
             // Read poses
             var bodyPoses = new List<TempCompCalculations.RobotPose>();
             foreach (var prog in _bodyPrograms)
@@ -486,44 +491,66 @@ namespace TempCompAddon
             double stepSize = (double)nudStepSize.Value;
 
             // Run criteria
-            var c1 = TempCompCalculations.CheckJ2J3Coverage(bodyPoses, tempCompPoses);
+            var j23 = TempCompCalculations.CheckJ23AngleCoverage(bodyPoses, tempCompPoses, robotType);
             var c2 = TempCompCalculations.CheckJ2J3Spread(tempCompPoses);
             var c3 = TempCompCalculations.CheckJ5Symmetry(tempCompPoses);
-            var c4 = TempCompCalculations.CheckJ2J3StepCoverage(bodyPoses, tempCompPoses, stepSize);
-            var c5 = TempCompCalculations.CheckJ456MaxCoverage(bodyPoses, tempCompPoses);
+            var j4 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J4);
+            var j5 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J5);
+            var j6 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J6);
+
+            double tcJ23Range = TempCompCalculations.CalculateJ23Range(tempCompPoses, robotType);
+            bool j23RangeOK = tcJ23Range >= 75.0;
+
             var bodySum = TempCompCalculations.CalculateSummary(bodyPoses);
             var tcSum = TempCompCalculations.CalculateSummary(tempCompPoses);
+
+
+
 
             // ── Tab 1: Validation ─────────────────────────────────
             lstValidation.Items.Clear();
 
-            AddValidationRow("1. J2/J3 Max Coverage",
-                string.Format("Body max J2: {0:F2} ({1} TC pts)", c1.MaxJ2_Body, c1.CountJ2),
-                string.Format("Body max J3: {0:F2} ({1} TC pts)", c1.MaxJ3_Body, c1.CountJ3),
-                "Min 2 TC pts >= body max", c1.IsValid);
+            AddValidationRow("J2-J3 Angle Max.",
+                string.Format("{0:F2} deg", j23.BodyMax),
+                string.Format("{0} TC pts >= body max", j23.CountMax),
+                "Min 2 TC pts >= body max",
+                j23.MaxOK);
 
-            AddValidationRow("2. J2/J3 Angular Spread",
-                string.Format("Spread: {0:F2} deg", c2.SpreadJ2),
-                string.Format("Spread: {0:F2} deg", c2.SpreadJ3),
-                "Min spread 75 deg", c2.IsValid);
+            AddValidationRow("J2-J3 Angle Min.",
+                string.Format("{0:F2} deg", j23.BodyMin),
+                string.Format("{0} TC pts <= body min", j23.CountMin),
+                "Min 2 TC pts <= body min",
+                j23.MinOK);
 
-            AddValidationRow("3. J5 Symmetry",
-                string.Format("Neg: {0} / Pos: {1}", c3.NegCount, c3.PosCount),
-                "", string.Format("Total: {0} pts", c3.Total), c3.IsValid);
+            AddValidationRow("J2-3 Range > 75°",
+                string.Format("{0:F2} deg", TempCompCalculations.CalculateJ23Range(bodyPoses, robotType)),
+                string.Format("{0:F2} deg", tcJ23Range),
+                "TC range >= 75 deg",
+                j23RangeOK);
 
-            AddValidationRow("4. J2/J3 Step Coverage",
-                c4.J2_OK ? "OK" : string.Format("{0} gaps", c4.J2_Gaps.Count),
-                c4.J3_OK ? "OK" : string.Format("{0} gaps", c4.J3_Gaps.Count),
-                string.Format("Step: {0} deg", stepSize), c4.IsValid);
-
-            AddValidationRow("5. J4/J5/J6 Max Coverage",
-                string.Format("J4:{0} J5:{1} J6:{2}",
-                    c5.J4_OK ? "OK" : "NOK",
-                    c5.J5_OK ? "OK" : "NOK",
-                    c5.J6_OK ? "OK" : "NOK"),
+            AddValidationRow("J5 Symmetry",
                 "",
-                string.Format("Max J4:{0:F2} J6:{1:F1}", c5.MaxJ4_Body, c5.MaxJ6_Body),
-                c5.IsValid);
+                string.Format("Neg: {0} / Pos: {1}", c3.NegCount, c3.PosCount),
+                string.Format("Total: {0} pts", c3.Total),
+                c3.IsValid);
+
+            AddValidationRow("J4 Max",
+                string.Format("{0:F2} deg", j4.BodyMax),
+                string.Format("{0:F2} deg", j4.TcMax),
+                "TC max >= body max",
+                j4.IsValid);
+
+            AddValidationRow("J5 Max",
+                string.Format("{0:F2} deg", j5.BodyMax),
+                string.Format("{0:F2} deg", j5.TcMax),
+                "TC max >= body max",
+                j5.IsValid);
+
+            AddValidationRow("J6 Max",
+                string.Format("{0:F2} deg", j6.BodyMax),
+                string.Format("{0:F2} deg", j6.TcMax),
+                "TC max >= body max",
+                j6.IsValid);
 
             // Summary separator
             var sep = new ListViewItem("--- Summary ---");

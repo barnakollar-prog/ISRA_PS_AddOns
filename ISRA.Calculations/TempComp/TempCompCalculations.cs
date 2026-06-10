@@ -19,6 +19,47 @@ namespace ISRA.Calculations.TempComp
             public double J5 { get; set; }
             public double J6 { get; set; }
         }
+        // ── Robot type ────────────────────────────────────────
+
+        public enum RobotType { Fanuc, Kuka, Abb }
+
+        /// <summary>
+        /// Calculates J2-3 angle based on robot type.
+        /// </summary>
+        public static double CalculateJ23Angle(RobotPose pose, RobotType robotType)
+        {
+            switch (robotType)
+            {
+                case RobotType.Fanuc:
+                    return pose.J2 + pose.J3 + 90.0;
+                case RobotType.Kuka:
+                    return (-1.0) * pose.J3 + 180.0;
+                case RobotType.Abb:
+                    return (-1.0) * pose.J3 + 90.0;
+                default:
+                    return pose.J2 + pose.J3 + 90.0;
+            }
+        }
+
+        /// <summary>
+        /// Calculates J2-3 range (max - min) for a list of poses.
+        /// </summary>
+        public static double CalculateJ23Range(List<RobotPose> poses, RobotType robotType)
+        {
+            if (poses.Count == 0) return 0.0;
+
+            double min = double.MaxValue;
+            double max = double.MinValue;
+
+            foreach (var p in poses)
+            {
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle < min) min = angle;
+                if (angle > max) max = angle;
+            }
+
+            return max - min;
+        }
 
         /// <summary>
         /// Result of nearest TC point search for one body point.
@@ -184,6 +225,89 @@ namespace ISRA.Calculations.TempComp
                 J2_OK = j2ok,
                 J3_OK = j3ok,
                 IsValid = j2ok && j3ok
+            };
+        }
+        // ── Criterion: J2-3 Angle Max/Min Coverage ────────────────
+
+        public class J23AngleCoverageResult
+        {
+            public double BodyMax { get; set; }
+            public double BodyMin { get; set; }
+            public int CountMax { get; set; }
+            public int CountMin { get; set; }
+            public bool MaxOK { get; set; }
+            public bool MinOK { get; set; }
+        }
+
+        public static J23AngleCoverageResult CheckJ23AngleCoverage(
+            List<RobotPose> bodyPoses,
+            List<RobotPose> tempCompPoses,
+            RobotType robotType)
+        {
+            double bodyMax = double.MinValue;
+            double bodyMin = double.MaxValue;
+
+            foreach (var p in bodyPoses)
+            {
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle > bodyMax) bodyMax = angle;
+                if (angle < bodyMin) bodyMin = angle;
+            }
+
+            int countMax = 0, countMin = 0;
+            foreach (var p in tempCompPoses)
+            {
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle >= bodyMax) countMax++;
+                if (angle <= bodyMin) countMin++;
+            }
+
+            return new J23AngleCoverageResult
+            {
+                BodyMax = bodyMax,
+                BodyMin = bodyMin,
+                CountMax = countMax,
+                CountMin = countMin,
+                MaxOK = countMax >= 2,
+                MinOK = countMin >= 2
+            };
+        }
+
+        // ── Criterion: J4/J5/J6 Max/Min individual ───────────────
+
+        public class AxisCoverageResult
+        {
+            public double BodyMax { get; set; }
+            public double TcMax { get; set; }
+            public bool IsValid { get; set; }
+        }
+
+        public static AxisCoverageResult CheckAxisMaxCoverage(
+            List<RobotPose> bodyPoses,
+            List<RobotPose> tempCompPoses,
+            Func<RobotPose, double> selector)
+        {
+            double bodyMax = double.MinValue;
+            foreach (var p in bodyPoses)
+            {
+                double v = Math.Abs(selector(p));
+                if (v > bodyMax) bodyMax = v;
+            }
+
+            double tcMax = double.MinValue;
+            bool covered = false;
+            foreach (var p in tempCompPoses)
+            {
+                double v = Math.Abs(selector(p));
+                if (v > tcMax) tcMax = v;
+                if (v >= bodyMax) covered = true;
+            }
+
+            return new AxisCoverageResult
+            {
+                BodyMax = bodyMax,
+                TcMax = tcMax,
+                IsValid = covered
             };
         }
 
