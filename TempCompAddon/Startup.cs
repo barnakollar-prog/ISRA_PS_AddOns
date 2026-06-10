@@ -23,7 +23,7 @@ namespace TempCompAddon
     public class TempCompForm : TxForm
     {
         // ── Controls ──────────────────────────────────────────────
-
+        private TxObjEditBoxCtrl pickerRobot;
         private ListView lstBodyPaths;
         private ListView lstTempCompPaths;
         private Button btnPickBodyPaths;
@@ -32,12 +32,17 @@ namespace TempCompAddon
         private Button btnClearTempCompPaths;
         private NumericUpDown nudStepSize;
         private Button btnAnalyze;
-        private ListView lstResults;
 
-        private readonly List<TxWeldOperation> _bodyPrograms = new List<TxWeldOperation>();
-        private readonly List<TxWeldOperation> _tempCompPrograms = new List<TxWeldOperation>();
+        // Tab results
+        private ListView lstValidation;
+        private ListView lstNearestTc;
+        private ListView lstRawData;
 
-        // Track which list is currently being picked
+        private readonly List<TxWeldOperation> _bodyPrograms
+            = new List<TxWeldOperation>();
+        private readonly List<TxWeldOperation> _tempCompPrograms
+            = new List<TxWeldOperation>();
+
         private enum PickMode { None, Body, TempComp }
         private PickMode _pickMode = PickMode.None;
 
@@ -48,54 +53,85 @@ namespace TempCompAddon
             this.ShouldCloseOnDocumentUnloading = true;
             this.FormClosing += OnFormClosing;
             BuildUI();
-
-            // Subscribe to PS selection changes
             TxApplication.ActiveSelection.ItemsSet += OnSelectionChanged;
         }
 
         private void BuildUI()
         {
             this.Text = "Temp Comp Validator";
-            this.Width = 680;
-            this.Height = 820;
+            this.Width = 800;
+            this.Height = 900;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new Size(500, 650);
+            this.MinimumSize = new Size(600, 700);
 
             int lx = 10;
             int y = 15;
 
-            
+            // ── Robot ─────────────────────────────────────────────
+            var grpRobot = new GroupBox
+            {
+                Text = "Robot",
+                Left = lx,
+                Top = y,
+                Width = 765,
+                Height = 58,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpRobot.Controls.Add(new Label
+            {
+                Text = "Robot:",
+                Left = 8,
+                Top = 20,
+                Width = 70,
+                Height = 24,
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            pickerRobot = new TxObjEditBoxCtrl
+            {
+                Left = 82,
+                Top = 20,
+                Width = 668,
+                Height = 24,
+                ValidatorType = TxValidatorType.Robot,
+                PickLevel = TxPickLevel.Component,
+                PickOnly = false,
+                ListenToPick = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpRobot.Controls.Add(pickerRobot);
+            this.Controls.Add(grpRobot);
+            y += 68;
+
             // ── Bodypart paths ────────────────────────────────────
             var grpBody = new GroupBox
             {
                 Text = "Bodypart Measurement Paths",
                 Left = lx,
                 Top = y,
-                Width = 645,
-                Height = 155,
+                Width = 765,
+                Height = 130,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-
             lstBodyPaths = new ListView
             {
                 Left = 8,
                 Top = 18,
-                Width = 540,
-                Height = 120,  // magasabb
+                Width = 660,
+                Height = 95,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 Font = new Font("Consolas", 8),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
-             AnchorStyles.Right | AnchorStyles.Bottom
+                         AnchorStyles.Right | AnchorStyles.Bottom
             };
-            lstBodyPaths.Columns.Add("Path Name", 520);
+            lstBodyPaths.Columns.Add("Path Name", 640);
             grpBody.Controls.Add(lstBodyPaths);
 
             btnPickBodyPaths = new Button
             {
                 Text = "Pick",
-                Left = 556,
+                Left = 676,
                 Top = 18,
                 Width = 80,
                 Height = 28,
@@ -110,7 +146,7 @@ namespace TempCompAddon
             btnClearBodyPaths = new Button
             {
                 Text = "Clear",
-                Left = 556,
+                Left = 676,
                 Top = 50,
                 Width = 80,
                 Height = 28,
@@ -125,7 +161,8 @@ namespace TempCompAddon
                 lstBodyPaths.Items.Clear();
             };
             grpBody.Controls.Add(btnClearBodyPaths);
-            y += 130;
+            this.Controls.Add(grpBody);
+            y += 140;
 
             // ── Temp Comp paths ───────────────────────────────────
             var grpTempComp = new GroupBox
@@ -133,31 +170,30 @@ namespace TempCompAddon
                 Text = "Temp Comp Paths",
                 Left = lx,
                 Top = y,
-                Width = 645,
-                Height = 155,
+                Width = 765,
+                Height = 130,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-
             lstTempCompPaths = new ListView
             {
                 Left = 8,
                 Top = 18,
-                Width = 540,
-                Height = 120,  // magasabb
+                Width = 660,
+                Height = 95,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 Font = new Font("Consolas", 8),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
-             AnchorStyles.Right | AnchorStyles.Bottom
+                         AnchorStyles.Right | AnchorStyles.Bottom
             };
-            lstTempCompPaths.Columns.Add("Path Name", 520);
+            lstTempCompPaths.Columns.Add("Path Name", 640);
             grpTempComp.Controls.Add(lstTempCompPaths);
 
             btnPickTempCompPaths = new Button
             {
                 Text = "Pick",
-                Left = 556,
+                Left = 676,
                 Top = 18,
                 Width = 80,
                 Height = 28,
@@ -172,7 +208,7 @@ namespace TempCompAddon
             btnClearTempCompPaths = new Button
             {
                 Text = "Clear",
-                Left = 556,
+                Left = 676,
                 Top = 50,
                 Width = 80,
                 Height = 28,
@@ -187,7 +223,8 @@ namespace TempCompAddon
                 lstTempCompPaths.Items.Clear();
             };
             grpTempComp.Controls.Add(btnClearTempCompPaths);
-            y += 130;
+            this.Controls.Add(grpTempComp);
+            y += 140;
 
             // ── Settings ──────────────────────────────────────────
             var grpSettings = new GroupBox
@@ -195,7 +232,7 @@ namespace TempCompAddon
                 Text = "Settings",
                 Left = lx,
                 Top = y,
-                Width = 645,
+                Width = 765,
                 Height = 48,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -220,6 +257,7 @@ namespace TempCompAddon
                 DecimalPlaces = 0
             };
             grpSettings.Controls.Add(nudStepSize);
+            this.Controls.Add(grpSettings);
             y += 58;
 
             // ── Analyze button ────────────────────────────────────
@@ -228,7 +266,7 @@ namespace TempCompAddon
                 Text = "Analyze",
                 Left = lx,
                 Top = y,
-                Width = 645,
+                Width = 765,
                 Height = 36,
                 BackColor = Color.FromArgb(180, 0, 0),
                 ForeColor = Color.White,
@@ -237,45 +275,90 @@ namespace TempCompAddon
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             btnAnalyze.Click += OnAnalyze;
+            this.Controls.Add(btnAnalyze);
             y += 44;
 
-            // ── Results ───────────────────────────────────────────
-            var lblRes = new Label
-            {
-                Text = "Results:",
-                Left = lx,
-                Top = y,
-                Width = 100,
-                Height = 20,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
-            };
-            y += 22;
-
-            lstResults = new ListView
+            // ── Tab Control ───────────────────────────────────────
+            var tabControl = new TabControl
             {
                 Left = lx,
                 Top = y,
-                Width = 645,
-                Height = 220,
-                View = View.Details,
-                FullRowSelect = true,
-                GridLines = true,
-                Font = new Font("Consolas", 9),
+                Width = 765,
+                Height = 380,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
                          AnchorStyles.Right | AnchorStyles.Bottom
             };
-            lstResults.Columns.Add("Criterion", 220);
-            lstResults.Columns.Add("J2", 90);
-            lstResults.Columns.Add("J3", 90);
-            lstResults.Columns.Add("Details", 200);
-            lstResults.Columns.Add("Status", 80);
 
-            this.Controls.Add(grpBody);
-            this.Controls.Add(grpTempComp);
-            this.Controls.Add(grpSettings);
-            this.Controls.Add(btnAnalyze);
-            this.Controls.Add(lblRes);
-            this.Controls.Add(lstResults);
+            // Tab 1: Validation
+            var tabValidation = new TabPage { Text = "Validation" };
+            lstValidation = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Font = new Font("Consolas", 9)
+            };
+            lstValidation.Columns.Add("Criterion", 220);
+            lstValidation.Columns.Add("J2", 110);
+            lstValidation.Columns.Add("J3", 110);
+            lstValidation.Columns.Add("Details", 200);
+            lstValidation.Columns.Add("Status", 80);
+            tabValidation.Controls.Add(lstValidation);
+
+            // Tab 2: Nearest TC
+            var tabNearest = new TabPage { Text = "Nearest TC Point" };
+            lstNearestTc = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Font = new Font("Consolas", 8)
+            };
+            lstNearestTc.Columns.Add("Body Point", 120);
+            lstNearestTc.Columns.Add("J2", 60);
+            lstNearestTc.Columns.Add("J3", 60);
+            lstNearestTc.Columns.Add("J4", 60);
+            lstNearestTc.Columns.Add("J5", 60);
+            lstNearestTc.Columns.Add("TC Point", 120);
+            lstNearestTc.Columns.Add("TC J2", 60);
+            lstNearestTc.Columns.Add("TC J3", 60);
+            lstNearestTc.Columns.Add("TC J4", 60);
+            lstNearestTc.Columns.Add("TC J5", 60);
+            lstNearestTc.Columns.Add("Dist", 60);
+            tabNearest.Controls.Add(lstNearestTc);
+
+            // Tab 3: Raw Data
+            var tabRaw = new TabPage { Text = "Raw Data" };
+            lstRawData = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Font = new Font("Consolas", 8)
+            };
+            lstRawData.Columns.Add("Body Point", 110);
+            lstRawData.Columns.Add("J1", 50);
+            lstRawData.Columns.Add("J2", 50);
+            lstRawData.Columns.Add("J3", 50);
+            lstRawData.Columns.Add("J4", 50);
+            lstRawData.Columns.Add("J5", 50);
+            lstRawData.Columns.Add("J6", 50);
+            lstRawData.Columns.Add("TC Point", 110);
+            lstRawData.Columns.Add("TC J1", 50);
+            lstRawData.Columns.Add("TC J2", 50);
+            lstRawData.Columns.Add("TC J3", 50);
+            lstRawData.Columns.Add("TC J4", 50);
+            lstRawData.Columns.Add("TC J5", 50);
+            lstRawData.Columns.Add("TC J6", 50);
+            tabRaw.Controls.Add(lstRawData);
+
+            tabControl.TabPages.Add(tabValidation);
+            tabControl.TabPages.Add(tabNearest);
+            tabControl.TabPages.Add(tabRaw);
+            this.Controls.Add(tabControl);
         }
 
         // ── Pick from PS ──────────────────────────────────────────
@@ -283,26 +366,18 @@ namespace TempCompAddon
         {
             _pickMode = mode;
 
-            // Visual feedback
             btnPickBodyPaths.BackColor = mode == PickMode.Body
-                ? Color.FromArgb(0, 160, 0)
-                : Color.FromArgb(0, 100, 180);
+                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
             btnPickTempCompPaths.BackColor = mode == PickMode.TempComp
-                ? Color.FromArgb(0, 160, 0)
-                : Color.FromArgb(0, 100, 180);
+                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
 
             MessageBox.Show(
                 string.Format("Select {0} paths in PS, then click OK.",
                     mode == PickMode.Body ? "Bodypart" : "Temp Comp"),
-                "Pick Paths",
-                MessageBoxButtons.OK,
-                MessageBoxIcon.Information);
+                "Pick Paths", MessageBoxButtons.OK, MessageBoxIcon.Information);
 
-            // Read current PS selection
-            var selection = TxApplication.ActiveSelection;
-            AddFromSelection(selection.GetItems());
+            AddFromSelection(TxApplication.ActiveSelection.GetItems());
 
-            // Reset pick mode
             _pickMode = PickMode.None;
             btnPickBodyPaths.BackColor = Color.FromArgb(0, 100, 180);
             btnPickTempCompPaths.BackColor = Color.FromArgb(0, 100, 180);
@@ -311,8 +386,7 @@ namespace TempCompAddon
         private void OnSelectionChanged(object sender, TxSelection_ItemsSetEventArgs e)
         {
             if (_pickMode == PickMode.None) return;
-            var selection = TxApplication.ActiveSelection;
-            AddFromSelection(selection.GetItems());
+            AddFromSelection(TxApplication.ActiveSelection.GetItems());
         }
 
         private void AddFromSelection(TxObjectList items)
@@ -344,17 +418,12 @@ namespace TempCompAddon
         // ── Analyze ───────────────────────────────────────────────
         private void OnAnalyze(object sender, EventArgs e)
         {
-            lstResults.Items.Clear();
-
-            
-
             if (_bodyPrograms.Count == 0)
             {
                 MessageBox.Show("Please select at least one Bodypart Path.",
                     "Missing Input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
             if (_tempCompPrograms.Count == 0)
             {
                 MessageBox.Show("Please select at least one Temp Comp Path.",
@@ -362,14 +431,22 @@ namespace TempCompAddon
                 return;
             }
 
-            // Read poses from Path
+            var robot = pickerRobot.Object as TxRobot;
+            if (robot == null)
+            {
+                MessageBox.Show("Please select a Robot.", "Missing Input",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Read poses
             var bodyPoses = new List<TempCompCalculations.RobotPose>();
             foreach (var prog in _bodyPrograms)
-                bodyPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog));
+                bodyPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog, robot));
 
             var tempCompPoses = new List<TempCompCalculations.RobotPose>();
             foreach (var prog in _tempCompPrograms)
-                tempCompPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog));
+                tempCompPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog, robot));
 
             if (bodyPoses.Count == 0)
             {
@@ -377,7 +454,6 @@ namespace TempCompAddon
                     MessageBoxButtons.OK, MessageBoxIcon.Error);
                 return;
             }
-
             if (tempCompPoses.Count == 0)
             {
                 MessageBox.Show("No poses found in Temp Comp Paths.", "Error",
@@ -387,49 +463,116 @@ namespace TempCompAddon
 
             double stepSize = (double)nudStepSize.Value;
 
-
-
             // Run criteria
             var c1 = TempCompCalculations.CheckJ2J3Coverage(bodyPoses, tempCompPoses);
             var c2 = TempCompCalculations.CheckJ2J3Spread(tempCompPoses);
             var c3 = TempCompCalculations.CheckJ5Symmetry(tempCompPoses);
             var c4 = TempCompCalculations.CheckJ2J3StepCoverage(bodyPoses, tempCompPoses, stepSize);
             var c5 = TempCompCalculations.CheckJ456MaxCoverage(bodyPoses, tempCompPoses);
+            var bodySum = TempCompCalculations.CalculateSummary(bodyPoses);
+            var tcSum = TempCompCalculations.CalculateSummary(tempCompPoses);
 
-            // Display results
-            AddResultRow("1. J2/J3 Max Coverage",
-                string.Format("Body max J2: {0:F1} ({1} TC pts)", c1.MaxJ2_Body, c1.CountJ2),
-                string.Format("Body max J3: {0:F1} ({1} TC pts)", c1.MaxJ3_Body, c1.CountJ3),
+            // ── Tab 1: Validation ─────────────────────────────────
+            lstValidation.Items.Clear();
+
+            AddValidationRow("1. J2/J3 Max Coverage",
+                string.Format("Body max J2: {0:F2} ({1} TC pts)", c1.MaxJ2_Body, c1.CountJ2),
+                string.Format("Body max J3: {0:F2} ({1} TC pts)", c1.MaxJ3_Body, c1.CountJ3),
                 "Min 2 TC pts >= body max", c1.IsValid);
 
-            AddResultRow("2. J2/J3 Angular Spread",
-                string.Format("Spread: {0:F1} deg", c2.SpreadJ2),
-                string.Format("Spread: {0:F1} deg", c2.SpreadJ3),
+            AddValidationRow("2. J2/J3 Angular Spread",
+                string.Format("Spread: {0:F2} deg", c2.SpreadJ2),
+                string.Format("Spread: {0:F2} deg", c2.SpreadJ3),
                 "Min spread 75 deg", c2.IsValid);
 
-            AddResultRow("3. J5 Symmetry",
+            AddValidationRow("3. J5 Symmetry",
                 string.Format("Neg: {0} / Pos: {1}", c3.NegCount, c3.PosCount),
                 "", string.Format("Total: {0} pts", c3.Total), c3.IsValid);
 
-            AddResultRow("4. J2/J3 Step Coverage",
+            AddValidationRow("4. J2/J3 Step Coverage",
                 c4.J2_OK ? "OK" : string.Format("{0} gaps", c4.J2_Gaps.Count),
                 c4.J3_OK ? "OK" : string.Format("{0} gaps", c4.J3_Gaps.Count),
                 string.Format("Step: {0} deg", stepSize), c4.IsValid);
 
-            AddResultRow("5. J4/J5/J6 Max Coverage",
+            AddValidationRow("5. J4/J5/J6 Max Coverage",
                 string.Format("J4:{0} J5:{1} J6:{2}",
                     c5.J4_OK ? "OK" : "NOK",
                     c5.J5_OK ? "OK" : "NOK",
                     c5.J6_OK ? "OK" : "NOK"),
                 "",
-                string.Format("Max J4:{0:F1} J6:{1:F1}", c5.MaxJ4_Body, c5.MaxJ6_Body),
+                string.Format("Max J4:{0:F2} J6:{1:F1}", c5.MaxJ4_Body, c5.MaxJ6_Body),
                 c5.IsValid);
 
-            foreach (ColumnHeader col in lstResults.Columns)
+            // Summary separator
+            var sep = new ListViewItem("--- Summary ---");
+            for (int i = 0; i < 4; i++) sep.SubItems.Add("");
+            sep.BackColor = Color.LightGray;
+            lstValidation.Items.Add(sep);
+
+            AddSummaryRow("Body J2", bodySum.J2_Min, bodySum.J2_Max);
+            AddSummaryRow("Body J3", bodySum.J3_Min, bodySum.J3_Max);
+            AddSummaryRow("TC J2", tcSum.J2_Min, tcSum.J2_Max);
+            AddSummaryRow("TC J3", tcSum.J3_Min, tcSum.J3_Max);
+            AddSummaryRow("TC J4", tcSum.J4_Min, tcSum.J4_Max);
+            AddSummaryRow("TC J5", tcSum.J5_Min, tcSum.J5_Max);
+            AddSummaryRow("TC J6", tcSum.J6_Min, tcSum.J6_Max);
+
+            foreach (ColumnHeader col in lstValidation.Columns)
+                col.Width = -2;
+
+            // ── Tab 2: Nearest TC ─────────────────────────────────
+            lstNearestTc.Items.Clear();
+            var nearest = TempCompCalculations.FindNearestTcPoints(bodyPoses, tempCompPoses);
+            foreach (var r in nearest)
+            {
+                var item = new ListViewItem(r.BodyPose.Name);
+                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J2));
+                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J3));
+                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J4));
+                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J5));
+                item.SubItems.Add(r.NearestTcPose != null ? r.NearestTcPose.Name : "N/A");
+                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J2) : "-");
+                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J3) : "-");
+                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J4) : "-");
+                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J5) : "-");
+                item.SubItems.Add(string.Format("{0:F2}", r.Distance));
+                item.BackColor = Color.White;
+                lstNearestTc.Items.Add(item);
+            }
+            foreach (ColumnHeader col in lstNearestTc.Columns)
+                col.Width = -2;
+
+            // ── Tab 3: Raw Data ───────────────────────────────────
+            lstRawData.Items.Clear();
+            int maxRows = Math.Max(bodyPoses.Count, tempCompPoses.Count);
+            for (int i = 0; i < maxRows; i++)
+            {
+                var body = i < bodyPoses.Count ? bodyPoses[i] : null;
+                var tc = i < tempCompPoses.Count ? tempCompPoses[i] : null;
+
+                var item = new ListViewItem(body != null ? body.Name : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J4) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J6) : "");
+                item.SubItems.Add(tc != null ? tc.Name : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J4) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J6) : "");
+                item.BackColor = i % 2 == 0 ? Color.White : Color.FromArgb(245, 245, 245);
+                lstRawData.Items.Add(item);
+            }
+            foreach (ColumnHeader col in lstRawData.Columns)
                 col.Width = -2;
         }
 
-        private void AddResultRow(string criterion,
+        // ── Helpers ───────────────────────────────────────────────
+        private void AddValidationRow(string criterion,
             string j2val, string j3val, string details, bool ok)
         {
             var item = new ListViewItem(criterion);
@@ -438,7 +581,18 @@ namespace TempCompAddon
             item.SubItems.Add(details);
             item.SubItems.Add(ok ? "OK" : "NOK");
             item.BackColor = ok ? Color.LightGreen : Color.LightCoral;
-            lstResults.Items.Add(item);
+            lstValidation.Items.Add(item);
+        }
+
+        private void AddSummaryRow(string label, double min, double max)
+        {
+            var item = new ListViewItem(label);
+            item.SubItems.Add(string.Format("Min: {0:F2} deg", min));
+            item.SubItems.Add(string.Format("Max: {0:F2} deg", max));
+            item.SubItems.Add("");
+            item.SubItems.Add("");
+            item.BackColor = Color.FromArgb(245, 245, 245);
+            lstValidation.Items.Add(item);
         }
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)

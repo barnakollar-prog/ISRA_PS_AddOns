@@ -5,16 +5,10 @@ using Tecnomatix.Engineering;
 
 namespace ISRA.Calculations.TempComp
 {
-    /// <summary>
-    /// Calculations and validation for Temperature Compensation paths.
-    /// </summary>
     public static class TempCompCalculations
     {
         // ── Data structures ───────────────────────────────────────
 
-        /// <summary>
-        /// Represents a robot pose with J1-J6 axis values in degrees.
-        /// </summary>
         public class RobotPose
         {
             public string Name { get; set; }
@@ -26,39 +20,51 @@ namespace ISRA.Calculations.TempComp
             public double J6 { get; set; }
         }
 
-        // ── PS API helpers ────────────────────────────────────────
+        /// <summary>
+        /// Result of nearest TC point search for one body point.
+        /// </summary>
+        public class NearestTcResult
+        {
+            public RobotPose BodyPose { get; set; }
+            public RobotPose NearestTcPose { get; set; }
+            public double Distance { get; set; }
+        }
 
         /// <summary>
-        /// Reads all robot poses from a WeldOperation path.
-        /// Robot is extracted automatically from the path.
+        /// Summary statistics for a list of poses.
         /// </summary>
-        public static List<RobotPose> ReadPosesFromProgram(TxWeldOperation program)
+        public class PoseSummary
+        {
+            public double J1_Min { get; set; }
+            public double J1_Max { get; set; }
+            public double J2_Min { get; set; }
+            public double J2_Max { get; set; }
+            public double J3_Min { get; set; }
+            public double J3_Max { get; set; }
+            public double J4_Min { get; set; }
+            public double J4_Max { get; set; }
+            public double J5_Min { get; set; }
+            public double J5_Max { get; set; }
+            public double J6_Min { get; set; }
+            public double J6_Max { get; set; }
+            public int J5_NegCount { get; set; }
+            public int J5_PosCount { get; set; }
+        }
+
+        // ── Weights for Euclidean distance ────────────────────────
+        private const double W_J2 = 2.0;
+        private const double W_J3 = 2.0;
+        private const double W_J4 = 1.0;
+        private const double W_J5 = 1.0;
+
+        // ── PS API helper ─────────────────────────────────────────
+
+        public static List<RobotPose> ReadPosesFromProgram(
+            TxWeldOperation program, TxRobot robot)
         {
             var poses = new List<RobotPose>();
-
-            // Try to get robot from path
-            TxRobot robot = null;
-            try
-            {
-                robot = program.Robot as TxRobot;
-            }
-            catch { }
-
-            // If not found on path, try parent operation
-            if (robot == null)
-            {
-                try
-                {
-                    var parent = program.Collection as TxWeldOperation;
-                    if (parent != null)
-                        robot = parent.Robot as TxRobot;
-                }
-                catch { }
-            }
-
             if (robot == null) return poses;
 
-            // Get all location operations
             var elements = program.GetAllDescendants(
                 new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
             if (elements == null) return poses;
@@ -79,12 +85,12 @@ namespace ISRA.Calculations.TempComp
                     poses.Add(new RobotPose
                     {
                         Name = loc.Name,
-                        J1 = Convert.ToDouble(joints[0]),
-                        J2 = Convert.ToDouble(joints[1]),
-                        J3 = Convert.ToDouble(joints[2]),
-                        J4 = Convert.ToDouble(joints[3]),
-                        J5 = Convert.ToDouble(joints[4]),
-                        J6 = Convert.ToDouble(joints[5])
+                        J1 = Convert.ToDouble(joints[0]) * (180.0 / Math.PI),
+                        J2 = Convert.ToDouble(joints[1]) * (180.0 / Math.PI),
+                        J3 = Convert.ToDouble(joints[2]) * (180.0 / Math.PI),
+                        J4 = Convert.ToDouble(joints[3]) * (180.0 / Math.PI),
+                        J5 = Convert.ToDouble(joints[4]) * (180.0 / Math.PI),
+                        J6 = Convert.ToDouble(joints[5]) * (180.0 / Math.PI)
                     });
                 }
                 catch { }
@@ -93,7 +99,48 @@ namespace ISRA.Calculations.TempComp
             return poses;
         }
 
-        // ── Criterion 1: J2-J3 Max Coverage ──────────────────────
+        // ── Summary statistics ────────────────────────────────────
+
+        public static PoseSummary CalculateSummary(List<RobotPose> poses)
+        {
+            var s = new PoseSummary
+            {
+                J1_Min = double.MaxValue,
+                J1_Max = double.MinValue,
+                J2_Min = double.MaxValue,
+                J2_Max = double.MinValue,
+                J3_Min = double.MaxValue,
+                J3_Max = double.MinValue,
+                J4_Min = double.MaxValue,
+                J4_Max = double.MinValue,
+                J5_Min = double.MaxValue,
+                J5_Max = double.MinValue,
+                J6_Min = double.MaxValue,
+                J6_Max = double.MinValue,
+            };
+
+            foreach (var p in poses)
+            {
+                if (p.J1 < s.J1_Min) s.J1_Min = p.J1;
+                if (p.J1 > s.J1_Max) s.J1_Max = p.J1;
+                if (p.J2 < s.J2_Min) s.J2_Min = p.J2;
+                if (p.J2 > s.J2_Max) s.J2_Max = p.J2;
+                if (p.J3 < s.J3_Min) s.J3_Min = p.J3;
+                if (p.J3 > s.J3_Max) s.J3_Max = p.J3;
+                if (p.J4 < s.J4_Min) s.J4_Min = p.J4;
+                if (p.J4 > s.J4_Max) s.J4_Max = p.J4;
+                if (p.J5 < s.J5_Min) s.J5_Min = p.J5;
+                if (p.J5 > s.J5_Max) s.J5_Max = p.J5;
+                if (p.J6 < s.J6_Min) s.J6_Min = p.J6;
+                if (p.J6 > s.J6_Max) s.J6_Max = p.J6;
+                if (p.J5 < 0) s.J5_NegCount++;
+                else if (p.J5 > 0) s.J5_PosCount++;
+            }
+
+            return s;
+        }
+
+        // ── Criterion 1: J2-J3 Coverage ──────────────────────────
 
         public class CoverageResult
         {
@@ -140,7 +187,7 @@ namespace ISRA.Calculations.TempComp
             };
         }
 
-        // ── Criterion 2: J2-J3 Angular Spread ────────────────────
+        // ── Criterion 2: J2-J3 Spread ────────────────────────────
 
         public class SpreadResult
         {
@@ -166,7 +213,6 @@ namespace ISRA.Calculations.TempComp
 
             double spreadJ2 = maxJ2 - minJ2;
             double spreadJ3 = maxJ3 - minJ3;
-
             bool j2ok = spreadJ2 >= 75.0;
             bool j3ok = spreadJ3 >= 75.0;
 
@@ -248,7 +294,7 @@ namespace ISRA.Calculations.TempComp
                 foreach (var p in tempCompPoses)
                     if (p.J2 >= s && p.J2 < end) { covered = true; break; }
                 if (!covered)
-                    j2gaps.Add(string.Format("{0:F0} to {1:F0} deg", s, end));
+                    j2gaps.Add(string.Format("{0:F0} to {1:F0}", s, end));
             }
 
             for (double s = minJ3; s < maxJ3; s += stepSizeDeg)
@@ -258,7 +304,7 @@ namespace ISRA.Calculations.TempComp
                 foreach (var p in tempCompPoses)
                     if (p.J3 >= s && p.J3 < end) { covered = true; break; }
                 if (!covered)
-                    j3gaps.Add(string.Format("{0:F0} to {1:F0} deg", s, end));
+                    j3gaps.Add(string.Format("{0:F0} to {1:F0}", s, end));
             }
 
             return new StepCoverageResult
@@ -271,7 +317,7 @@ namespace ISRA.Calculations.TempComp
             };
         }
 
-        // ── Criterion 5: J4, J5, J6 Max Coverage ─────────────────
+        // ── Criterion 5: J4/J5/J6 Max Coverage ───────────────────
 
         public class MaxCoverageResult
         {
@@ -302,7 +348,6 @@ namespace ISRA.Calculations.TempComp
             }
 
             bool j4ok = false, j5posok = false, j5negok = false, j6ok = false;
-
             foreach (var p in tempCompPoses)
             {
                 if (Math.Abs(p.J4) >= maxJ4) j4ok = true;
@@ -322,6 +367,71 @@ namespace ISRA.Calculations.TempComp
                 J6_OK = j6ok,
                 IsValid = j4ok && j5posok && j5negok && j6ok
             };
+        }
+
+        // ── Nearest TC Point (Euclidean distance) ─────────────────
+
+        /// <summary>
+        /// Normalizes J4/J6 difference for 360° rotational axes.
+        /// </summary>
+        private static double NormalizeAngleDiff(double diff)
+        {
+            diff = Math.Abs(diff) % 360.0;
+            if (diff > 180.0) diff = 360.0 - diff;
+            return diff;
+        }
+
+        /// <summary>
+        /// Calculates weighted Euclidean distance between two poses.
+        /// J1, J6 not used. J2, J3 weighted 2.0. J4, J5 weighted 1.0.
+        /// J4 normalized for 360° rotation.
+        /// </summary>
+        public static double CalculateDistance(RobotPose a, RobotPose b)
+        {
+            double dJ2 = a.J2 - b.J2;
+            double dJ3 = a.J3 - b.J3;
+            double dJ4 = NormalizeAngleDiff(a.J4 - b.J4);
+            double dJ5 = a.J5 - b.J5;
+
+            return Math.Sqrt(
+                W_J2 * dJ2 * dJ2 +
+                W_J3 * dJ3 * dJ3 +
+                W_J4 * dJ4 * dJ4 +
+                W_J5 * dJ5 * dJ5);
+        }
+
+        /// <summary>
+        /// For each body pose, finds the nearest temp comp pose.
+        /// </summary>
+        public static List<NearestTcResult> FindNearestTcPoints(
+            List<RobotPose> bodyPoses, List<RobotPose> tempCompPoses)
+        {
+            var results = new List<NearestTcResult>();
+
+            foreach (var body in bodyPoses)
+            {
+                RobotPose nearest = null;
+                double minDist = double.MaxValue;
+
+                foreach (var tc in tempCompPoses)
+                {
+                    double dist = CalculateDistance(body, tc);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        nearest = tc;
+                    }
+                }
+
+                results.Add(new NearestTcResult
+                {
+                    BodyPose = body,
+                    NearestTcPose = nearest,
+                    Distance = minDist
+                });
+            }
+
+            return results;
         }
     }
 }
