@@ -40,6 +40,9 @@ namespace TempCompAddon
         private Button btnClearBodyPaths;
         private Button btnPickTempCompPaths;
         private Button btnClearTempCompPaths;
+        private Button btnRemoveBodyPaths;
+        private Button btnRemoveTempCompPaths;
+        private Button btnHelp;
         private NumericUpDown nudStepSize;
         private Button btnAnalyze;
         private RadioButton rbFanuc;
@@ -165,11 +168,34 @@ namespace TempCompAddon
             btnPickBodyPaths.Click += OnPickBodyClick;
             grpBody.Controls.Add(btnPickBodyPaths);
 
+            btnRemoveBodyPaths = new Button
+            {
+                Text = "Remove",
+                Left = 676,
+                Top = 50,
+                Width = 80,
+                Height = 28,
+                BackColor = Color.FromArgb(180, 120, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnRemoveBodyPaths.Click += (s, e) =>
+            {
+                for (int i = lstBodyPaths.SelectedIndices.Count - 1; i >= 0; i--)
+                {
+                    int idx = lstBodyPaths.SelectedIndices[i];
+                    _bodyPrograms.RemoveAt(idx);
+                    lstBodyPaths.Items.RemoveAt(idx);
+                }
+            };
+            grpBody.Controls.Add(btnRemoveBodyPaths);
+
             btnClearBodyPaths = new Button
             {
                 Text = "Clear",
                 Left = 676,
-                Top = 50,
+                Top = 82,
                 Width = 80,
                 Height = 28,
                 BackColor = Color.FromArgb(100, 100, 100),
@@ -227,11 +253,34 @@ namespace TempCompAddon
             btnPickTempCompPaths.Click += OnPickTempCompClick;
             grpTempComp.Controls.Add(btnPickTempCompPaths);
 
+            btnRemoveTempCompPaths = new Button
+            {
+                Text = "Remove",
+                Left = 676,
+                Top = 50,
+                Width = 80,
+                Height = 28,
+                BackColor = Color.FromArgb(180, 120, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Anchor = AnchorStyles.Top | AnchorStyles.Right
+            };
+            btnRemoveTempCompPaths.Click += (s, e) =>
+            {
+                for (int i = lstTempCompPaths.SelectedIndices.Count - 1; i >= 0; i--)
+                {
+                    int idx = lstTempCompPaths.SelectedIndices[i];
+                    _tempCompPrograms.RemoveAt(idx);
+                    lstTempCompPaths.Items.RemoveAt(idx);
+                }
+            };
+            grpTempComp.Controls.Add(btnRemoveTempCompPaths);
+
             btnClearTempCompPaths = new Button
             {
                 Text = "Clear",
                 Left = 676,
-                Top = 50,
+                Top = 82,
                 Width = 80,
                 Height = 28,
                 BackColor = Color.FromArgb(100, 100, 100),
@@ -306,7 +355,7 @@ namespace TempCompAddon
                 Left = lx,
                 Top = y,
                 Width = 765,
-                Height = 380,
+                Height = 340,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
                          AnchorStyles.Right | AnchorStyles.Bottom
             };
@@ -348,7 +397,7 @@ namespace TempCompAddon
             lstNearestTc.Columns.Add("TC J4", 60);
             lstNearestTc.Columns.Add("TC J5", 60);
             lstNearestTc.Columns.Add("TC J6", 60);
-            lstNearestTc.Columns.Add("Dist", 60);
+            lstNearestTc.Columns.Add("Max Diff", 60);
             tabNearest.Controls.Add(lstNearestTc);
 
             // Tab 3: Raw Data
@@ -383,6 +432,23 @@ namespace TempCompAddon
             tabControl.TabPages.Add(tabNearest);
             tabControl.TabPages.Add(tabRaw);
             this.Controls.Add(tabControl);
+
+            // ── Help button ───────────────────────────────────────
+            btnHelp = new Button
+            {
+                Text = "Help / About",
+                Left = lx,
+                Top = this.ClientSize.Height - 38,
+                Width = 765,
+                Height = 28,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+            };
+            btnHelp.Click += (s, e) => HelpAbout.ShowAbout();
+            this.Controls.Add(btnHelp);
         }
 
         // ── Pick from PS ──────────────────────────────────────────
@@ -412,6 +478,7 @@ namespace TempCompAddon
             var mode = _pickMode;
             _pickMode = PickMode.None;
             UpdatePickButtons();
+            try { TxApplication.ActiveSelection.Clear(); } catch { }
 
             int count = mode == PickMode.Body
                 ? _bodyPrograms.Count
@@ -435,6 +502,7 @@ namespace TempCompAddon
             btnPickTempCompPaths.BackColor = _pickMode == PickMode.TempComp
                 ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
         }
+
 
         private void OnSelectionChanged(object sender, TxSelection_ItemsSetEventArgs e)
         {
@@ -630,8 +698,11 @@ namespace TempCompAddon
                         TempCompCalculations.NormalizeAngle180(t.J6)));
                     s6.BackColor = DiffColor(d6, threshold);
 
-                    var sd = item.SubItems.Add(string.Format("{0:F2}", r.Distance));
-                    sd.BackColor = DiffColor(r.Distance, threshold);
+                    double maxDiff = Math.Max(Math.Max(Math.Abs(d23), Math.Abs(d4)),
+                                              Math.Max(Math.Abs(d5), Math.Abs(d6)));
+
+                    var sd = item.SubItems.Add(string.Format("{0:F2}", maxDiff));
+                    sd.BackColor = DiffColor(maxDiff, threshold);
                 }
                 else
                 {
@@ -656,13 +727,16 @@ namespace TempCompAddon
                 if (a < bodyMin23) bodyMin23 = a;
             }
 
-            // ← IDE JÖN AZ ÚJ RÉSZ: TC J2-3 szélsőértékek
-            double tcMax23 = double.MinValue, tcMin23 = double.MaxValue;
+            // TC J2-3: 2 legnagyobb és 2 legkisebb érték keresése
+            double tcMax1 = double.MinValue, tcMax2 = double.MinValue;
+            double tcMin1 = double.MaxValue, tcMin2 = double.MaxValue;
             foreach (var t in tempCompPoses)
             {
                 double a = TempCompCalculations.CalculateJ23Angle(t, robotType);
-                if (a > tcMax23) tcMax23 = a;
-                if (a < tcMin23) tcMin23 = a;
+                if (a > tcMax1) { tcMax2 = tcMax1; tcMax1 = a; }
+                else if (a > tcMax2) tcMax2 = a;
+                if (a < tcMin1) { tcMin2 = tcMin1; tcMin1 = a; }
+                else if (a < tcMin2) tcMin2 = a;
             }
 
             int maxRows = Math.Max(bodyPoses.Count, tempCompPoses.Count);
@@ -678,18 +752,20 @@ namespace TempCompAddon
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
                 item.SubItems.Add(body != null
-                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J4)) : "");
+                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J4)) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
                 item.SubItems.Add(body != null
-                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J6)) : "");
+                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J6)) : "");
 
-                // Body J2-3 cella
+                // Body J2-3 cella: max = zöld, min = világoskék
                 if (body != null)
                 {
                     double bodyA = TempCompCalculations.CalculateJ23Angle(body, robotType);
                     var sub = item.SubItems.Add(string.Format("{0:F2}", bodyA));
-                    if (bodyA == bodyMax23 || bodyA == bodyMin23)
-                        sub.BackColor = Color.LightGray;   // envelope-definiáló pont
+                    if (bodyA == bodyMax23)
+                        sub.BackColor = Color.LightGreen;
+                    else if (bodyA == bodyMin23)
+                        sub.BackColor = Color.LightBlue;
                 }
                 else item.SubItems.Add("");
 
@@ -698,25 +774,36 @@ namespace TempCompAddon
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
                 item.SubItems.Add(tc != null
-                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J4)) : "");
+                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J4)) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
                 item.SubItems.Add(tc != null
-                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J6)) : "");
+                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J6)) : "");
 
-                // TC J2-3 cella ← EZ A RÉSZ CSERÉLŐDIK
+                // TC J2-3 cella: csak a 2 legnagyobb / 2 legkisebb kap színt
                 if (tc != null)
                 {
                     double tcA = TempCompCalculations.CalculateJ23Angle(tc, robotType);
                     var sub = item.SubItems.Add(string.Format("{0:F2}", tcA));
 
-                    if (!j23.MaxOK && tcA == tcMax23)
-                        sub.BackColor = Color.Gold;        // legnagyobb TC, de nem elég nagy
-                    else if (!j23.MinOK && tcA == tcMin23)
-                        sub.BackColor = Color.Gold;        // legkisebb TC, de nem elég kicsi
-                    else
-                        sub.BackColor = (tcA >= bodyMax23 || tcA <= bodyMin23)
-                            ? Color.LightGreen
-                            : Color.LightCoral;
+                    if (tcA >= tcMax2)                       // a 2 legnagyobb közé tartozik
+                    {
+                        if (tcA >= bodyMax23)
+                            sub.BackColor = Color.LightGreen;     // lefedi a body max-ot
+                        else if (bodyMax23 - tcA < threshold)
+                            sub.BackColor = Color.Gold;           // közel, de nem elég
+                        else
+                            sub.BackColor = Color.LightCoral;     // messze van
+                    }
+                    else if (tcA <= tcMin2)                  // a 2 legkisebb közé tartozik
+                    {
+                        if (tcA <= bodyMin23)
+                            sub.BackColor = Color.LightBlue;      // lefedi a body min-t
+                        else if (tcA - bodyMin23 < threshold)
+                            sub.BackColor = Color.Gold;
+                        else
+                            sub.BackColor = Color.LightCoral;
+                    }
+                    // többi pont: nincs szín
                 }
                 else item.SubItems.Add("");
 
@@ -725,8 +812,8 @@ namespace TempCompAddon
 
             foreach (ColumnHeader col in lstRawData.Columns)
                 col.Width = -2;
-        }
 
+        }
         // ── Helpers ───────────────────────────────────────────────
         private void AddValidationRow(string criterion,
             string j2val, string j3val, string details, bool ok)
