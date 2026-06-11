@@ -162,7 +162,7 @@ namespace TempCompAddon
                 FlatStyle = FlatStyle.Flat,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnPickBodyPaths.Click += (s, e) => StartPicking(PickMode.Body);
+            btnPickBodyPaths.Click += OnPickBodyClick;
             grpBody.Controls.Add(btnPickBodyPaths);
 
             btnClearBodyPaths = new Button
@@ -224,7 +224,7 @@ namespace TempCompAddon
                 FlatStyle = FlatStyle.Flat,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnPickTempCompPaths.Click += (s, e) => StartPicking(PickMode.TempComp);
+            btnPickTempCompPaths.Click += OnPickTempCompClick;
             grpTempComp.Controls.Add(btnPickTempCompPaths);
 
             btnClearTempCompPaths = new Button
@@ -260,7 +260,7 @@ namespace TempCompAddon
             };
             grpSettings.Controls.Add(new Label
             {
-                Text = "Step size J2/J3 (deg):",
+                Text = "Nearest TC distance (deg):",
                 Left = 8,
                 Top = 14,
                 Width = 150,
@@ -274,8 +274,8 @@ namespace TempCompAddon
                 Width = 70,
                 Height = 24,
                 Minimum = 5,
-                Maximum = 90,
-                Value = 30,
+                Maximum = 180,
+                Value = 35,
                 DecimalPlaces = 0
             };
             grpSettings.Controls.Add(nudStepSize);
@@ -339,15 +339,15 @@ namespace TempCompAddon
                 Font = new Font("Consolas", 8)
             };
             lstNearestTc.Columns.Add("Body Point", 120);
-            lstNearestTc.Columns.Add("J2", 60);
-            lstNearestTc.Columns.Add("J3", 60);
+            lstNearestTc.Columns.Add("J2-3", 60);
             lstNearestTc.Columns.Add("J4", 60);
             lstNearestTc.Columns.Add("J5", 60);
+            lstNearestTc.Columns.Add("J6", 60);
             lstNearestTc.Columns.Add("TC Point", 120);
-            lstNearestTc.Columns.Add("TC J2", 60);
-            lstNearestTc.Columns.Add("TC J3", 60);
+            lstNearestTc.Columns.Add("TC J2-3", 60);
             lstNearestTc.Columns.Add("TC J4", 60);
             lstNearestTc.Columns.Add("TC J5", 60);
+            lstNearestTc.Columns.Add("TC J6", 60);
             lstNearestTc.Columns.Add("Dist", 60);
             tabNearest.Controls.Add(lstNearestTc);
 
@@ -368,6 +368,7 @@ namespace TempCompAddon
             lstRawData.Columns.Add("J4", 50);
             lstRawData.Columns.Add("J5", 50);
             lstRawData.Columns.Add("J6", 50);
+            lstRawData.Columns.Add("J2-3", 60);
             lstRawData.Columns.Add("TC Point", 110);
             lstRawData.Columns.Add("TC J1", 50);
             lstRawData.Columns.Add("TC J2", 50);
@@ -375,6 +376,7 @@ namespace TempCompAddon
             lstRawData.Columns.Add("TC J4", 50);
             lstRawData.Columns.Add("TC J5", 50);
             lstRawData.Columns.Add("TC J6", 50);
+            lstRawData.Columns.Add("TC J2-3", 60);
             tabRaw.Controls.Add(lstRawData);
 
             tabControl.TabPages.Add(tabValidation);
@@ -384,25 +386,54 @@ namespace TempCompAddon
         }
 
         // ── Pick from PS ──────────────────────────────────────────
+        private void OnPickBodyClick(object sender, EventArgs e)
+        {
+            if (_pickMode == PickMode.Body) FinishPicking();
+            else StartPicking(PickMode.Body);
+        }
+
+        private void OnPickTempCompClick(object sender, EventArgs e)
+        {
+            if (_pickMode == PickMode.TempComp) FinishPicking();
+            else StartPicking(PickMode.TempComp);
+        }
+
         private void StartPicking(PickMode mode)
         {
             _pickMode = mode;
+            UpdatePickButtons();
 
-            btnPickBodyPaths.BackColor = mode == PickMode.Body
-                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
-            btnPickTempCompPaths.BackColor = mode == PickMode.TempComp
-                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
-
-            MessageBox.Show(
-                string.Format("Select {0} paths in PS, then click OK.",
-                    mode == PickMode.Body ? "Bodypart" : "Temp Comp"),
-                "Pick Paths", MessageBoxButtons.OK, MessageBoxIcon.Information);
-
+            // Ami már ki van jelölve PS-ben, azt rögtön felvesszük
             AddFromSelection(TxApplication.ActiveSelection.GetItems());
+        }
 
+        private void FinishPicking()
+        {
+            var mode = _pickMode;
             _pickMode = PickMode.None;
-            btnPickBodyPaths.BackColor = Color.FromArgb(0, 100, 180);
-            btnPickTempCompPaths.BackColor = Color.FromArgb(0, 100, 180);
+            UpdatePickButtons();
+
+            int count = mode == PickMode.Body
+                ? _bodyPrograms.Count
+                : _tempCompPrograms.Count;
+
+            if (count == 0)
+            {
+                MessageBox.Show(
+                    "No valid paths (Weld Operations) were selected in PS.",
+                    "Nothing Selected", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+            }
+        }
+
+        private void UpdatePickButtons()
+        {
+            btnPickBodyPaths.Text = _pickMode == PickMode.Body ? "OK" : "Pick";
+            btnPickBodyPaths.BackColor = _pickMode == PickMode.Body
+                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
+
+            btnPickTempCompPaths.Text = _pickMode == PickMode.TempComp ? "OK" : "Pick";
+            btnPickTempCompPaths.BackColor = _pickMode == PickMode.TempComp
+                ? Color.FromArgb(0, 160, 0) : Color.FromArgb(0, 100, 180);
         }
 
         private void OnSelectionChanged(object sender, TxSelection_ItemsSetEventArgs e)
@@ -411,12 +442,14 @@ namespace TempCompAddon
             AddFromSelection(TxApplication.ActiveSelection.GetItems());
         }
 
-        private void AddFromSelection(TxObjectList items)
+        private int AddFromSelection(TxObjectList items)
         {
+            int found = 0;
             foreach (ITxObject obj in items)
             {
                 var prog = obj as TxWeldOperation;
                 if (prog == null) continue;
+                found++;
 
                 if (_pickMode == PickMode.Body)
                 {
@@ -435,6 +468,8 @@ namespace TempCompAddon
                     }
                 }
             }
+            return found;
+        
         }
 
         // ── Analyze ───────────────────────────────────────────────
@@ -488,21 +523,21 @@ namespace TempCompAddon
                 return;
             }
 
-            double stepSize = (double)nudStepSize.Value;
+            double threshold = (double)nudStepSize.Value;
 
             // Run criteria
             var j23 = TempCompCalculations.CheckJ23AngleCoverage(bodyPoses, tempCompPoses, robotType);
             var c2 = TempCompCalculations.CheckJ2J3Spread(tempCompPoses);
             var c3 = TempCompCalculations.CheckJ5Symmetry(tempCompPoses);
-            var j4 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J4);
+            var j4 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses,
+            p => TempCompCalculations.NormalizeAngle180(p.J4));
             var j5 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J5);
-            var j6 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J6);
+            var j6 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses,
+            p => TempCompCalculations.NormalizeAngle180(p.J6));
 
             double tcJ23Range = TempCompCalculations.CalculateJ23Range(tempCompPoses, robotType);
             bool j23RangeOK = tcJ23Range >= 75.0;
 
-            var bodySum = TempCompCalculations.CalculateSummary(bodyPoses);
-            var tcSum = TempCompCalculations.CalculateSummary(tempCompPoses);
 
 
 
@@ -552,40 +587,58 @@ namespace TempCompAddon
                 "TC max >= body max",
                 j6.IsValid);
 
-            // Summary separator
-            var sep = new ListViewItem("--- Summary ---");
-            for (int i = 0; i < 4; i++) sep.SubItems.Add("");
-            sep.BackColor = Color.LightGray;
-            lstValidation.Items.Add(sep);
 
-            AddSummaryRow("Body J2", bodySum.J2_Min, bodySum.J2_Max);
-            AddSummaryRow("Body J3", bodySum.J3_Min, bodySum.J3_Max);
-            AddSummaryRow("TC J2", tcSum.J2_Min, tcSum.J2_Max);
-            AddSummaryRow("TC J3", tcSum.J3_Min, tcSum.J3_Max);
-            AddSummaryRow("TC J4", tcSum.J4_Min, tcSum.J4_Max);
-            AddSummaryRow("TC J5", tcSum.J5_Min, tcSum.J5_Max);
-            AddSummaryRow("TC J6", tcSum.J6_Min, tcSum.J6_Max);
-
-            foreach (ColumnHeader col in lstValidation.Columns)
-                col.Width = -2;
 
             // ── Tab 2: Nearest TC ─────────────────────────────────
             lstNearestTc.Items.Clear();
-            var nearest = TempCompCalculations.FindNearestTcPoints(bodyPoses, tempCompPoses);
+            var nearest = TempCompCalculations.FindNearestTcPoints(bodyPoses, tempCompPoses, robotType);
             foreach (var r in nearest)
             {
-                var item = new ListViewItem(r.BodyPose.Name);
-                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J2));
-                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J3));
-                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J4));
-                item.SubItems.Add(string.Format("{0:F2}", r.BodyPose.J5));
-                item.SubItems.Add(r.NearestTcPose != null ? r.NearestTcPose.Name : "N/A");
-                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J2) : "-");
-                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J3) : "-");
-                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J4) : "-");
-                item.SubItems.Add(r.NearestTcPose != null ? string.Format("{0:F2}", r.NearestTcPose.J5) : "-");
-                item.SubItems.Add(string.Format("{0:F2}", r.Distance));
-                item.BackColor = Color.White;
+                var b = r.BodyPose;
+                var t = r.NearestTcPose;
+
+                var item = new ListViewItem(b.Name);
+                item.UseItemStyleForSubItems = false;
+
+                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.CalculateJ23Angle(b, robotType)));
+                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(b.J4)));
+                item.SubItems.Add(string.Format("{0:F2}", b.J5));
+                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(b.J6)));
+
+                if (t != null)
+                {
+                    double d23 = TempCompCalculations.CalculateJ23Angle(t, robotType)
+                               - TempCompCalculations.CalculateJ23Angle(b, robotType);
+                    double d4 = TempCompCalculations.NormalizeAngle180(t.J4 - b.J4);
+                    double d5 = t.J5 - b.J5;
+                    double d6 = TempCompCalculations.NormalizeAngle180(t.J6 - b.J6);
+
+                    item.SubItems.Add(t.Name);
+
+                    var s23 = item.SubItems.Add(string.Format("{0:F2}",
+                        TempCompCalculations.CalculateJ23Angle(t, robotType)));
+                    s23.BackColor = DiffColor(d23, threshold);
+
+                    var s4 = item.SubItems.Add(string.Format("{0:F2}",
+                        TempCompCalculations.NormalizeAngle180(t.J4)));
+                    s4.BackColor = DiffColor(d4, threshold);
+
+                    var s5 = item.SubItems.Add(string.Format("{0:F2}", t.J5));
+                    s5.BackColor = DiffColor(d5, threshold);
+
+                    var s6 = item.SubItems.Add(string.Format("{0:F2}",
+                        TempCompCalculations.NormalizeAngle180(t.J6)));
+                    s6.BackColor = DiffColor(d6, threshold);
+
+                    var sd = item.SubItems.Add(string.Format("{0:F2}", r.Distance));
+                    sd.BackColor = DiffColor(r.Distance, threshold);
+                }
+                else
+                {
+                    item.SubItems.Add("N/A");
+                    for (int k = 0; k < 5; k++) item.SubItems.Add("-");
+                }
+
                 lstNearestTc.Items.Add(item);
             }
             foreach (ColumnHeader col in lstNearestTc.Columns)
@@ -593,6 +646,25 @@ namespace TempCompAddon
 
             // ── Tab 3: Raw Data ───────────────────────────────────
             lstRawData.Items.Clear();
+
+            // Body J2-3 envelope
+            double bodyMax23 = double.MinValue, bodyMin23 = double.MaxValue;
+            foreach (var b in bodyPoses)
+            {
+                double a = TempCompCalculations.CalculateJ23Angle(b, robotType);
+                if (a > bodyMax23) bodyMax23 = a;
+                if (a < bodyMin23) bodyMin23 = a;
+            }
+
+            // ← IDE JÖN AZ ÚJ RÉSZ: TC J2-3 szélsőértékek
+            double tcMax23 = double.MinValue, tcMin23 = double.MaxValue;
+            foreach (var t in tempCompPoses)
+            {
+                double a = TempCompCalculations.CalculateJ23Angle(t, robotType);
+                if (a > tcMax23) tcMax23 = a;
+                if (a < tcMin23) tcMin23 = a;
+            }
+
             int maxRows = Math.Max(bodyPoses.Count, tempCompPoses.Count);
             for (int i = 0; i < maxRows; i++)
             {
@@ -600,22 +672,57 @@ namespace TempCompAddon
                 var tc = i < tempCompPoses.Count ? tempCompPoses[i] : null;
 
                 var item = new ListViewItem(body != null ? body.Name : "");
+                item.UseItemStyleForSubItems = false;
+
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J4) : "");
+                item.SubItems.Add(body != null
+                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J4)) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J6) : "");
+                item.SubItems.Add(body != null
+                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J6)) : "");
+
+                // Body J2-3 cella
+                if (body != null)
+                {
+                    double bodyA = TempCompCalculations.CalculateJ23Angle(body, robotType);
+                    var sub = item.SubItems.Add(string.Format("{0:F2}", bodyA));
+                    if (bodyA == bodyMax23 || bodyA == bodyMin23)
+                        sub.BackColor = Color.LightGray;   // envelope-definiáló pont
+                }
+                else item.SubItems.Add("");
+
                 item.SubItems.Add(tc != null ? tc.Name : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J4) : "");
+                item.SubItems.Add(tc != null
+                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J4)) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J6) : "");
-                item.BackColor = i % 2 == 0 ? Color.White : Color.FromArgb(245, 245, 245);
+                item.SubItems.Add(tc != null
+                ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J6)) : "");
+
+                // TC J2-3 cella ← EZ A RÉSZ CSERÉLŐDIK
+                if (tc != null)
+                {
+                    double tcA = TempCompCalculations.CalculateJ23Angle(tc, robotType);
+                    var sub = item.SubItems.Add(string.Format("{0:F2}", tcA));
+
+                    if (!j23.MaxOK && tcA == tcMax23)
+                        sub.BackColor = Color.Gold;        // legnagyobb TC, de nem elég nagy
+                    else if (!j23.MinOK && tcA == tcMin23)
+                        sub.BackColor = Color.Gold;        // legkisebb TC, de nem elég kicsi
+                    else
+                        sub.BackColor = (tcA >= bodyMax23 || tcA <= bodyMin23)
+                            ? Color.LightGreen
+                            : Color.LightCoral;
+                }
+                else item.SubItems.Add("");
+
                 lstRawData.Items.Add(item);
             }
+
             foreach (ColumnHeader col in lstRawData.Columns)
                 col.Width = -2;
         }
@@ -632,30 +739,64 @@ namespace TempCompAddon
             item.BackColor = ok ? Color.LightGreen : Color.LightCoral;
             lstValidation.Items.Add(item);
         }
-
-        private void AddSummaryRow(string label, double min, double max)
+        private Color DiffColor(double diff, double t)
         {
-            var item = new ListViewItem(label);
-            item.SubItems.Add(string.Format("Min: {0:F2} deg", min));
-            item.SubItems.Add(string.Format("Max: {0:F2} deg", max));
-            item.SubItems.Add("");
-            item.SubItems.Add("");
-            item.BackColor = Color.FromArgb(245, 245, 245);
-            lstValidation.Items.Add(item);
+            diff = Math.Abs(diff);
+            if (diff < t) return Color.LightGreen;   // < 35
+            if (diff < 2 * t) return Color.Gold;         // 35–70
+            return Color.LightCoral;                       // > 70
         }
+
+
         private void OnRobotPicked(object sender, TxObjEditBoxCtrl_PickedEventArgs e)
         {
             var robot = e.Object as TxRobot;
             if (robot == null) return;
 
-            string name = robot.Name.ToLower();
+            TempCompCalculations.RobotType? detected = null;
 
-            if (name.Contains("kuka"))
+            // 1. Próba: 3D fájl útvonal (cojt path)
+            try
+            {
+                var libStorage = robot.StorageObject as TxLibraryStorage;
+                if (libStorage != null)
+                    detected = DetectRobotTypeFromPath(libStorage.FullPath);
+            }
+            catch { }
+
+            // 2. Fallback: robot név
+            if (detected == null)
+                detected = DetectRobotTypeFromPath(robot.Name);
+
+            if (detected == TempCompCalculations.RobotType.Kuka)
                 rbKuka.Checked = true;
-            else if (name.Contains("fanuc"))
+            else if (detected == TempCompCalculations.RobotType.Fanuc)
                 rbFanuc.Checked = true;
-            else if (name.Contains("abb"))
+            else if (detected == TempCompCalculations.RobotType.Abb)
                 rbAbb.Checked = true;
+        }
+
+        private TempCompCalculations.RobotType? DetectRobotTypeFromPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) return null;
+
+            string p = path.ToLower();
+
+            // Könyvtárak vizsgálata az útvonalban
+            if (p.Contains("kuka")) return TempCompCalculations.RobotType.Kuka;
+            if (p.Contains("fanuc")) return TempCompCalculations.RobotType.Fanuc;
+            if (p.Contains("abb")) return TempCompCalculations.RobotType.Abb;
+
+            // Hint: KUKA robotok cojt fájlneve gyakran "KR"-rel kezdődik
+            try
+            {
+                string fileName = System.IO.Path.GetFileNameWithoutExtension(path);
+                if (fileName.StartsWith("KR", StringComparison.OrdinalIgnoreCase))
+                    return TempCompCalculations.RobotType.Kuka;
+            }
+            catch { }
+
+            return null;
         }
         private void OnFormClosing(object sender, FormClosingEventArgs e)
         {

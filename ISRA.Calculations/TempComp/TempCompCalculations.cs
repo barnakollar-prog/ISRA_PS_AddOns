@@ -42,6 +42,18 @@ namespace ISRA.Calculations.TempComp
         }
 
         /// <summary>
+        /// Normalizes an angle to ±180° (shortest arc).
+        /// ΔA = ((Δ+180) mod 360) − 180
+        /// Example: −300° → ((−300+180) mod 360) − 180 = 240 − 180 = +60°
+        /// </summary>
+        public static double NormalizeAngle180(double angle)
+        {
+            double a = (angle + 180.0) % 360.0;
+            if (a < 0) a += 360.0;   // C# modulo lehet negatív
+            return a - 180.0;
+        }
+
+        /// <summary>
         /// Calculates J2-3 range (max - min) for a list of poses.
         /// </summary>
         public static double CalculateJ23Range(List<RobotPose> poses, RobotType robotType)
@@ -93,10 +105,10 @@ namespace ISRA.Calculations.TempComp
         }
 
         // ── Weights for Euclidean distance ────────────────────────
-        private const double W_J2 = 2.0;
-        private const double W_J3 = 2.0;
+        private const double W_J23 = 2.0;   // J2-3 domináns
         private const double W_J4 = 1.0;
         private const double W_J5 = 1.0;
+        private const double W_J6 = 1.0;
 
         // ── PS API helper ─────────────────────────────────────────
 
@@ -506,29 +518,25 @@ namespace ISRA.Calculations.TempComp
         }
 
         /// <summary>
-        /// Calculates weighted Euclidean distance between two poses.
-        /// J1, J6 not used. J2, J3 weighted 2.0. J4, J5 weighted 1.0.
-        /// J4 normalized for 360° rotation.
+        /// Distance between two poses: Euclidean over (ΔJ2-3, ΔJ4, ΔJ5, ΔJ6).
+        /// J4/J6 differences normalized to ±180° (shortest arc).
         /// </summary>
-        public static double CalculateDistance(RobotPose a, RobotPose b)
+        public static double CalculateDistance(RobotPose a, RobotPose b, RobotType robotType)
         {
-            double dJ2 = a.J2 - b.J2;
-            double dJ3 = a.J3 - b.J3;
-            double dJ4 = NormalizeAngleDiff(a.J4 - b.J4);
-            double dJ5 = a.J5 - b.J5;
+            double d23 = CalculateJ23Angle(a, robotType) - CalculateJ23Angle(b, robotType);
+            double d4 = NormalizeAngle180(a.J4 - b.J4);
+            double d5 = a.J5 - b.J5;
+            double d6 = NormalizeAngle180(a.J6 - b.J6);
 
             return Math.Sqrt(
-                W_J2 * dJ2 * dJ2 +
-                W_J3 * dJ3 * dJ3 +
-                W_J4 * dJ4 * dJ4 +
-                W_J5 * dJ5 * dJ5);
+                W_J23 * d23 * d23 +
+                W_J4 * d4 * d4 +
+                W_J5 * d5 * d5 +
+                W_J6 * d6 * d6);
         }
 
-        /// <summary>
-        /// For each body pose, finds the nearest temp comp pose.
-        /// </summary>
         public static List<NearestTcResult> FindNearestTcPoints(
-            List<RobotPose> bodyPoses, List<RobotPose> tempCompPoses)
+            List<RobotPose> bodyPoses, List<RobotPose> tempCompPoses, RobotType robotType)
         {
             var results = new List<NearestTcResult>();
 
@@ -539,7 +547,7 @@ namespace ISRA.Calculations.TempComp
 
                 foreach (var tc in tempCompPoses)
                 {
-                    double dist = CalculateDistance(body, tc);
+                    double dist = CalculateDistance(body, tc, robotType);
                     if (dist < minDist)
                     {
                         minDist = dist;
