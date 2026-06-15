@@ -1,4 +1,9 @@
 <Solution>
+  <Folder Name="/docs/">
+    <File Path="docs/README_StarVisibilityAnalyzer.md" />
+    <File Path="docs/README_TempCompValidator.md" />
+    <File Path="README.md" />
+  </Folder>
   <Folder Name="/Solution Items/">
     <File Path="README.md" />
   </Folder>

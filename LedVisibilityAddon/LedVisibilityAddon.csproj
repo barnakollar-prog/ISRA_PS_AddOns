@@ -127,6 +127,7 @@
   <ItemGroup>
     <None Include="app.config" />
     <None Include="packages.config" />
+    <None Include="README.md" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ISRA_PS_AddOns\ISRA.Calculations\ISRA.Calculations.csproj">
