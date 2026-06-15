@@ -572,11 +572,13 @@ namespace TempCompAddon
             // Read poses
             var bodyPoses = new List<TempCompCalculations.RobotPose>();
             foreach (var prog in _bodyPrograms)
-                bodyPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog, robot));
+                bodyPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(
+                    prog, robot, MeasurementPointFilter.BodyPrefixes));
 
             var tempCompPoses = new List<TempCompCalculations.RobotPose>();
             foreach (var prog in _tempCompPrograms)
-                tempCompPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(prog, robot));
+                tempCompPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(
+                    prog, robot, MeasurementPointFilter.TcPrefixes));
 
             if (bodyPoses.Count == 0)
             {

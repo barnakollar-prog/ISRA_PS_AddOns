@@ -113,43 +113,48 @@ namespace ISRA.Calculations.TempComp
         // ── PS API helper ─────────────────────────────────────────
 
         public static List<RobotPose> ReadPosesFromProgram(
-            TxWeldOperation program, TxRobot robot)
+          TxWeldOperation prog,
+    TxRobot robot,
+    string[] namePrefixes = null)  // null = nincs szűrés
         {
-            var poses = new List<RobotPose>();
-            if (robot == null) return poses;
-
-            var elements = program.GetAllDescendants(
+            var result = new List<RobotPose>();
+            var locations = prog.GetAllDescendants(
                 new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
-            if (elements == null) return poses;
 
-            foreach (ITxObject obj in elements)
+            foreach (ITxObject obj in locations)
             {
                 var loc = obj as ITxRoboticLocationOperation;
                 if (loc == null) continue;
 
+                // Szűrés – ha van prefix megadva
+                if (namePrefixes != null)
+                {
+                    if (!MeasurementPointFilter.IsMeasurementPoint(loc, namePrefixes))
+                        continue;
+                }
+
                 try
                 {
-                    TxPoseData pose = robot.GetPoseAtLocation(loc);
-                    if (pose == null) continue;
+                    var poseData = robot.GetPoseAtLocation(loc);
+                    if (poseData?.JointValues == null) continue;
 
-                    ArrayList joints = pose.JointValues;
-                    if (joints == null || joints.Count < 6) continue;
+                    var joints = poseData.JointValues;
+                    if (joints.Count < 6) continue;
 
-                    poses.Add(new RobotPose
+                    result.Add(new RobotPose
                     {
                         Name = loc.Name,
-                        J1 = Convert.ToDouble(joints[0]) * (180.0 / Math.PI),
-                        J2 = Convert.ToDouble(joints[1]) * (180.0 / Math.PI),
-                        J3 = Convert.ToDouble(joints[2]) * (180.0 / Math.PI),
-                        J4 = Convert.ToDouble(joints[3]) * (180.0 / Math.PI),
-                        J5 = Convert.ToDouble(joints[4]) * (180.0 / Math.PI),
-                        J6 = Convert.ToDouble(joints[5]) * (180.0 / Math.PI)
+                        J1 = (double)joints[0] * (180.0 / Math.PI),
+                        J2 = (double)joints[1] * (180.0 / Math.PI),
+                        J3 = (double)joints[2] * (180.0 / Math.PI),
+                        J4 = (double)joints[3] * (180.0 / Math.PI),
+                        J5 = (double)joints[4] * (180.0 / Math.PI),
+                        J6 = (double)joints[5] * (180.0 / Math.PI),
                     });
                 }
                 catch { }
             }
-
-            return poses;
+            return result;
         }
 
         // ── Summary statistics ────────────────────────────────────
