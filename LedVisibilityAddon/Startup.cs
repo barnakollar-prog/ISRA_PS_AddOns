@@ -8,6 +8,7 @@ using Tecnomatix.Engineering.DataTypes.Graphics;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Components.AccuSite.Stars;
 using ISRA.Calculations.AccuSite;
+using LedVisibilityAddon.Presentation;
 
 namespace LedVisibilityAddon
 {
@@ -33,8 +34,12 @@ namespace LedVisibilityAddon
         }
     }
 
-    public class VisibilityForm : TxForm
+    public class VisibilityForm : TxForm, ILedVisibilityView
     {
+        // ── MVP ───────────────────────────────────────────────────
+        private readonly LedVisibilityPresenter _presenter;
+        private readonly LedVisibilityReportFormatter _formatter;
+
         private TxObjEditBoxCtrl pickerTracker;
         private TxObjEditBoxCtrl pickerStar1;
         private TxObjEditBoxCtrl pickerStar2;
@@ -46,17 +51,11 @@ namespace LedVisibilityAddon
         private List<TxComponent> _cylinderComponents = new List<TxComponent>();
         private NumericUpDown nudMaxAngle;
 
-        // Tag constants for collapsible rows
-        private const string TAG_EMITTER_DETAIL = "emitter_detail";
-        private const string TAG_EMITTER_SUMMARY = "emitter_summary";
-        private const string TAG_TRIANGLE_DETAIL = "triangle_detail";
-        private const string TAG_TRIANGLE_SUMMARY = "triangle_summary";
-
         private readonly List<ITxDisplayableObject> _coloredObjects
             = new List<ITxDisplayableObject>();
         private TxComponent _triangleComponent = null;
         private TxComponent _emitterComponent = null;
-        private readonly tracker_920_0005 _trackerFov = new tracker_920_0005();
+        private readonly Tracker920_0005 _trackerFov = new Tracker920_0005();
 
         private static readonly TxColor ColorHighlight = new TxColor(255, 200, 0);
         private static readonly TxColor ColorOK = new TxColor(0, 200, 0);
@@ -65,6 +64,9 @@ namespace LedVisibilityAddon
 
         public VisibilityForm()
         {
+            _presenter = new LedVisibilityPresenter(this);
+            _formatter = new LedVisibilityReportFormatter();
+
             this.SemiModal = false;
             this.ShouldAutoPosition = true;
             this.ShouldCloseOnDocumentUnloading = true;
@@ -359,347 +361,128 @@ namespace LedVisibilityAddon
             if (lstResults.SelectedItems.Count == 0) return;
             var selected = lstResults.SelectedItems[0];
 
-            // Check if this is a collapsible summary row
-            var ct = selected.Tag as CollapsibleTag;
-            if (ct == null) return;
-
-            int summaryIndex = lstResults.Items.IndexOf(selected);
-            bool isExpanded = selected.Text.StartsWith("[-]");
-
-            if (isExpanded)
-            {
-                // Collapse - remove detail rows after summary
-                selected.Text = selected.Text.Replace("[-]", "[+]");
-                int removeFrom = summaryIndex + 1;
-                while (removeFrom < lstResults.Items.Count)
-                {
-                    var item = lstResults.Items[removeFrom];
-                    string itemTag = item.Tag as string;
-                    if (itemTag == TAG_EMITTER_DETAIL || itemTag == TAG_TRIANGLE_DETAIL)
-                        lstResults.Items.RemoveAt(removeFrom);
-                    else
-                        break;
-                }
-            }
-            else
-            {
-                // Expand - insert cloned detail rows
-                selected.Text = selected.Text.Replace("[+]", "[-]");
-                int insertAt = summaryIndex + 1;
-                foreach (var detail in ct.DetailItems)
-                {
-                    var clone = (ListViewItem)detail.Clone();
-                    lstResults.Items.Insert(insertAt++, clone);
-                }
-            }
+            _formatter.ToggleCollapsibleRow(selected, lstResults);
         }
 
         // ── Analyze ───────────────────────────────────────────────
         private void OnAnalyze(object sender, EventArgs e)
         {
-            lstResults.Items.Clear();
+            _presenter.Analyze();
+        }
 
-            var tracker = pickerTracker.Object;
-            if (tracker == null)
+        // ── ILedVisibilityView Implementation ─────────────────────
+        public ITxObject SelectedTracker => pickerTracker.Object;
+
+        public List<ITxObject> SelectedStars
+        {
+            get
             {
-                MessageBox.Show("Please select the Tracker.", "Missing Input",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                var stars = new List<ITxObject>();
+                var starPickers = new[] { pickerStar1, pickerStar2, pickerStar3 };
+                foreach (var picker in starPickers)
+                {
+                    if (picker.Object != null)
+                        stars.Add(picker.Object);
+                }
+                return stars;
             }
+        }
 
-            var trackerLoc = tracker as ITxLocatableObject;
-            if (trackerLoc == null) return;
+        public double MaxAngle => (double)nudMaxAngle.Value;
 
-            TxTransformation trackerWorld = trackerLoc.AbsoluteLocation;
-            double maxAngle = (double)nudMaxAngle.Value;
+        public List<TxComponent> CylinderComponents => _cylinderComponents;
 
-            var starPickers = new[] { pickerStar1, pickerStar2, pickerStar3 };
-            bool anyResult = false;
-            bool allOK = true;
-            var localPositions = new TxVector[3];
-            var worldPositions = new TxVector[3];
+        public void ClearResults()
+        {
+            lstResults.Items.Clear();
+        }
 
+        public void DeleteVisualizations()
+        {
             GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
             DeleteEmitterVisualization();
             CollisionCheck.DeleteCylinderVisualizations(_cylinderComponents);
+        }
 
-            for (int i = 0; i < starPickers.Length; i++)
+        public void DisplayStarResults(List<StarAnalysisResult> results)
+        {
+            _formatter.FormatStarResults(results, lstResults);
+        }
+
+        public void DisplayTriangleResult(TriangleAnalysisResult result)
+        {
+            _formatter.FormatTriangleResult(result, lstResults);
+
+            // Create PS visualization
+            try
             {
-                var starObj = starPickers[i].Object;
-                if (starObj == null) continue;
-                anyResult = true;
-
-                var starLoc = starObj as ITxLocatableObject;
-                if (starLoc == null) continue;
-
-                TxVector ledWorldPos = star_515_0139.GetLedWorldPosition(starLoc);
-                TxVector localPt = _trackerFov.ToLocalCoordinates(
-                    ledWorldPos, trackerWorld);
-                localPositions[i] = localPt;
-                worldPositions[i] = ledWorldPos;
-
-                // Criterion 1: Position zone
-                var zone = _trackerFov.GetPositionZone(localPt);
-                string zoneLabel = _trackerFov.GetPositionZoneLabel(localPt);
-
-                // Criterion 2: Emitter visibility
-                var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
-                    starLoc, trackerWorld, maxAngle);
-
-                // Criterion 3: Line of sight check
-                var losResult = CollisionCheck.CheckLineOfSight(
-                    starLoc, trackerWorld, _cylinderComponents);
-
-                bool starOK = zone != tracker_920_0005.PositionZone.NOK &&
-                              emitterResult.IsValid &&
-                              losResult.IsValid;
-                // Color in PS
-                var displayable = starObj as ITxDisplayableObject;
-                if (displayable != null)
+                if (result.WorldPositions != null && result.WorldPositions.Count == 3)
                 {
-                    try
-                    {
-                        TxColor col;
-                        if (zone == tracker_920_0005.PositionZone.NOK ||
-                            !emitterResult.IsValid)
-                            col = ColorNOK;
-                        else if (zone == tracker_920_0005.PositionZone.Warning)
-                            col = ColorWarn;
-                        else
-                            col = ColorOK;
-
-                        displayable.Color = col;
-                        if (!_coloredObjects.Contains(displayable))
-                            _coloredObjects.Add(displayable);
-                        TxApplication.RefreshDisplay();
-                    }
-                    catch { }
-                }
-
-                string shortName = starObj.Name.Length > 20
-                    ? "..." + starObj.Name.Substring(starObj.Name.Length - 17)
-                    : starObj.Name;
-
-                // ── Star header row ───────────────────────────────
-                var headerItem = new ListViewItem(shortName);
-                headerItem.SubItems.Add(string.Format("{0:F0}", localPt.X));
-                headerItem.SubItems.Add(string.Format("{0:F0}", localPt.Y));
-                headerItem.SubItems.Add(string.Format("{0:F0}", localPt.Z));
-                headerItem.SubItems.Add(_trackerFov.GetZoneName(localPt));
-                headerItem.SubItems.Add(zoneLabel);
-                headerItem.BackColor = zone == tracker_920_0005.PositionZone.NOK
-                    ? Color.LightCoral
-                    : zone == tracker_920_0005.PositionZone.Warning
-                        ? Color.LightYellow
-                        : Color.LightGreen;
-                lstResults.Items.Add(headerItem);
-
-                // ── Emitter summary row (collapsible) ─────────────
-                var emitters = star_515_0139.GetEmitters();
-                var cameras = tracker_920_0005.GetCameras();
-
-                string emitterSummaryText = string.Format(
-                    "{0}  Emitters: {1}/4 visible (min 3)",
-                    emitterResult.IsValid ? "[+]" : "[-]",
-                    emitterResult.VisibleEmitterCount);
-                // Line of sight summary row
-                var losSummaryText = string.Format(
-                    "{0}  Line of Sight: {1}",
-                    losResult.IsValid ? "[+]" : "[-]",
-                    losResult.Label);
-
-                var losDetails = new List<ListViewItem>();
-                foreach (var camRes in losResult.CameraResults)
-                {
-                    var di = new ListViewItem(
-                        string.Format("    {0}", camRes.CameraName));
-                    di.SubItems.Add(""); di.SubItems.Add("");
-                    di.SubItems.Add(""); di.SubItems.Add("");
-                    di.SubItems.Add(camRes.Label);
-                    di.Tag = TAG_EMITTER_DETAIL;
-                    di.BackColor = camRes.IsBlocked
-                        ? Color.FromArgb(255, 235, 235)
-                        : Color.FromArgb(235, 255, 235);
-                    losDetails.Add(di);
-                }
-
-                var losSummaryItem = new ListViewItem(losSummaryText);
-                losSummaryItem.SubItems.Add(""); losSummaryItem.SubItems.Add("");
-                losSummaryItem.SubItems.Add(""); losSummaryItem.SubItems.Add("");
-                losSummaryItem.SubItems.Add(losResult.IsValid ? "OK" : "BLOCKED");
-                losSummaryItem.BackColor = losResult.IsValid
-                    ? Color.FromArgb(220, 255, 220)
-                    : Color.FromArgb(255, 220, 220);
-                losSummaryItem.Tag = new CollapsibleTag
-                {
-                    TagType = TAG_EMITTER_DETAIL,
-                    DetailItems = losDetails
-                };
-                lstResults.Items.Add(losSummaryItem);
-
-                if (!losResult.IsValid)
-                {
-                    foreach (var detail in losDetails)
-                        lstResults.Items.Add(detail);
-                    losSummaryItem.Text = losSummaryItem.Text.Replace("[+]", "[-]");
-                }
-                // Build detail rows
-                var detailItems = new List<ListViewItem>();
-                for (int e2 = 0; e2 < emitters.Length; e2++)
-                {
-                    for (int c = 0; c < cameras.Length; c++)
-                    {
-                        var res = emitterResult.Results[e2, c];
-                        var detailItem = new ListViewItem(
-                            string.Format("    {0} / {1}",
-                                emitters[e2].Name, cameras[c].Name));
-                        detailItem.SubItems.Add("");
-                        detailItem.SubItems.Add("");
-                        detailItem.SubItems.Add("");
-                        detailItem.SubItems.Add(string.Format(
-                            "Max: {0} deg", maxAngle));
-                        detailItem.SubItems.Add(res.Label);
-                        detailItem.Tag = TAG_EMITTER_DETAIL;
-                        detailItem.BackColor = res.IsVisible
-                            ? Color.FromArgb(235, 255, 235)
-                            : Color.FromArgb(255, 235, 235);
-                        detailItems.Add(detailItem);
-                    }
-                }
-
-                var emitterSummaryItem = new ListViewItem(emitterSummaryText);
-                emitterSummaryItem.SubItems.Add("");
-                emitterSummaryItem.SubItems.Add("");
-                emitterSummaryItem.SubItems.Add("");
-                emitterSummaryItem.SubItems.Add(string.Format(
-                    "E:{0}{1}{2}{3}",
-                    emitterResult.EmitterVisibleFromAllCameras[0] ? "1" : "-",
-                    emitterResult.EmitterVisibleFromAllCameras[1] ? "2" : "-",
-                    emitterResult.EmitterVisibleFromAllCameras[2] ? "3" : "-",
-                    emitterResult.EmitterVisibleFromAllCameras[3] ? "4" : "-"));
-                emitterSummaryItem.SubItems.Add(
-                    emitterResult.IsValid ? "OK" : "NOK");
-                emitterSummaryItem.BackColor = emitterResult.IsValid
-                    ? Color.FromArgb(220, 255, 220)
-                    : Color.FromArgb(255, 220, 220);
-                emitterSummaryItem.Tag = new CollapsibleTag
-                {
-                    TagType = TAG_EMITTER_SUMMARY,
-                    DetailItems = detailItems
-                };
-
-                lstResults.Items.Add(emitterSummaryItem);
-
-                // If NOK expand immediately
-                if (!emitterResult.IsValid)
-                {
-                    foreach (var detail in detailItems)
-                        lstResults.Items.Add(detail);
-                    emitterSummaryItem.Text = emitterSummaryItem.Text
-                        .Replace("[+]", "[-]");
+                    _triangleComponent = GeometryCalculations.CreateTriangleVisualization(
+                        result.WorldPositions[0],
+                        result.WorldPositions[1],
+                        result.WorldPositions[2],
+                        result.IsValid);
                 }
             }
-
-            if (!anyResult)
+            catch (Exception ex)
             {
-                MessageBox.Show("Please select at least one Star.", "Missing Input",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
+                MessageBox.Show("Triangle visualization error: " + ex.Message,
+                    "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
 
-            // ── Triangle ──────────────────────────────────────────
-            GeometryCalculations.DeleteTriangleVisualization(ref _triangleComponent);
+            AutoResizeColumns();
+        }
 
-            if (allOK &&
-                localPositions[0] != null &&
-                localPositions[1] != null &&
-                localPositions[2] != null)
+        public void DisplayTriangleSkipped(string reason)
+        {
+            _formatter.FormatTriangleSkipped(reason, lstResults);
+            AutoResizeColumns();
+        }
+
+        public void ColorizeStarInScene(ITxObject starObj, PositionZone zone, bool emitterValid)
+        {
+            var displayable = starObj as ITxDisplayableObject;
+            if (displayable == null) return;
+
+            try
             {
-                var tri = GeometryCalculations.CalculateTriangleHeight(
-                    localPositions[0], localPositions[1], localPositions[2]);
+                TxColor col;
+                if (zone == PositionZone.NOK || !emitterValid)
+                    col = ColorNOK;
+                else if (zone == PositionZone.Warning)
+                    col = ColorWarn;
+                else
+                    col = ColorOK;
 
-                // Triangle summary row
-                string triSummaryText = string.Format(
-                    "{0}  Triangle Height: {1:F0} mm (min 500)",
-                    tri.IsValid ? "[+]" : "[-]",
-                    tri.Height);
-
-                // Triangle detail rows
-                var triDetails = new List<ListViewItem>();
-                var triRows = new[]
-                {
-                    new { Label = "Side Star1-Star2", Value = tri.SideAB },
-                    new { Label = "Side Star2-Star3", Value = tri.SideBC },
-                    new { Label = "Side Star3-Star1", Value = tri.SideCA },
-                    new { Label = "Longest side",     Value = tri.LongestSide },
-                };
-                foreach (var tr in triRows)
-                {
-                    var di = new ListViewItem("  " + tr.Label);
-                    di.SubItems.Add(string.Format("{0:F0}", tr.Value));
-                    di.SubItems.Add("mm");
-                    di.SubItems.Add(""); di.SubItems.Add(""); di.SubItems.Add("");
-                    di.Tag = TAG_TRIANGLE_DETAIL;
-                    di.BackColor = Color.FromArgb(245, 245, 245);
-                    triDetails.Add(di);
-                }
-
-                var triSummaryItem = new ListViewItem(triSummaryText);
-                triSummaryItem.SubItems.Add(""); triSummaryItem.SubItems.Add("");
-                triSummaryItem.SubItems.Add(""); triSummaryItem.SubItems.Add("");
-                triSummaryItem.SubItems.Add(tri.IsValid ? "OK" : "FAIL");
-                triSummaryItem.BackColor = tri.IsValid
-                    ? Color.FromArgb(0, 220, 0)
-                    : Color.LightCoral;
-                triSummaryItem.ForeColor = tri.IsValid ? Color.White : Color.Black;
-                triSummaryItem.Tag = new CollapsibleTag
-                {
-                    TagType = TAG_TRIANGLE_SUMMARY,
-                    DetailItems = triDetails
-                };
-                lstResults.Items.Add(triSummaryItem);
-
-                // If FAIL expand immediately
-                if (!tri.IsValid)
-                {
-                    foreach (var detail in triDetails)
-                        lstResults.Items.Add(detail);
-                    triSummaryItem.Text = triSummaryItem.Text
-                        .Replace("[+]", "[-]");
-                }
-
-                // PS visualization
-                try
-                {
-                    if (worldPositions[0] != null &&
-                        worldPositions[1] != null &&
-                        worldPositions[2] != null)
-                    {
-                        _triangleComponent = GeometryCalculations
-                            .CreateTriangleVisualization(
-                                worldPositions[0], worldPositions[1],
-                                worldPositions[2], tri.IsValid);
-                    }
-                }
-                catch (Exception ex)
-                {
-                    MessageBox.Show("Triangle visualization error: " + ex.Message,
-                        "Warning", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
+                displayable.Color = col;
+                if (!_coloredObjects.Contains(displayable))
+                    _coloredObjects.Add(displayable);
             }
-            else if (anyResult && !allOK)
+            catch { }
+        }
+
+        public void RefreshDisplay()
+        {
+            try
             {
-                var skip = new ListViewItem("Triangle: not calculated");
-                skip.SubItems.Add(""); skip.SubItems.Add("");
-                skip.SubItems.Add(""); skip.SubItems.Add("");
-                skip.SubItems.Add("Not all stars OK");
-                skip.BackColor = Color.LightYellow;
-                lstResults.Items.Add(skip);
+                TxApplication.RefreshDisplay();
             }
+            catch { }
+        }
 
+        public void ShowError(string message, string title)
+        {
+            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        private void AutoResizeColumns()
+        {
             foreach (ColumnHeader col in lstResults.Columns)
                 col.Width = -2;
         }
+
+        // ── Helpers ───────────────────────────────────────────────
 
         // ── Emitter visualization ─────────────────────────────────
         private void DeleteEmitterVisualization()
@@ -748,7 +531,7 @@ namespace LedVisibilityAddon
                 var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
                     starLoc, trackerWorld, (double)nudMaxAngle.Value);
 
-                bool ok = zone != tracker_920_0005.PositionZone.NOK &&
+                bool ok = zone != PositionZone.NOK &&
                           emitterResult.IsValid;
 
                 rows.Add(new ExportRow
@@ -815,14 +598,5 @@ namespace LedVisibilityAddon
             try { TxApplication.RefreshDisplay(); }
             catch { }
         }
-    }
-
-    /// <summary>
-    /// Helper class to store collapsible row data.
-    /// </summary>
-    public class CollapsibleTag
-    {
-        public string TagType { get; set; }
-        public List<ListViewItem> DetailItems { get; set; }
     }
 }

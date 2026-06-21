@@ -51,7 +51,9 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Accusite\SensorHolders\SensorHolder_Base.cs" />
+    <Compile Include="Accusite\Stars\IStar.cs" />
     <Compile Include="Accusite\Stars\star_515_0139.cs" />
+    <Compile Include="Accusite\Trackers\ITracker.cs" />
     <Compile Include="Accusite\Trackers\tracker_920_0005.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

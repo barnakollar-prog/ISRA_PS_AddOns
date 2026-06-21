@@ -52,6 +52,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="HelpAbout.cs" />
+    <Compile Include="Presentation\TempCompPresenter.cs" />
+    <Compile Include="Presentation\TempCompReportFormatter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Startup.cs" />
     <Compile Include="StringTable.Designer.cs">
@@ -69,9 +72,12 @@
       <Project>{006ca160-0ab3-4a01-8305-b7bf26f7847c}</Project>
       <Name>ISRA.Components</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ISRA.Core\ISRA.Core.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="TempCompAddon.xml" />
+    <EmbeddedResource Include="temp_comp_add_on_16x16.bmp" />
+    <EmbeddedResource Include="temp_comp_add_on_32x32.png" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="StringTable.resx">

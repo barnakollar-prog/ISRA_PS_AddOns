@@ -5,16 +5,10 @@ using Tecnomatix.Engineering;
 
 namespace ISRA.Calculations.TempComp
 {
-    /// <summary>
-    /// Calculations and validation for Temperature Compensation paths.
-    /// </summary>
     public static class TempCompCalculations
     {
         // ── Data structures ───────────────────────────────────────
 
-        /// <summary>
-        /// Represents a robot pose with J1-J6 axis values in degrees.
-        /// </summary>
         public class RobotPose
         {
             public string Name { get; set; }
@@ -25,75 +19,186 @@ namespace ISRA.Calculations.TempComp
             public double J5 { get; set; }
             public double J6 { get; set; }
         }
+        // ── Robot type ────────────────────────────────────────
 
-        // ── PS API helpers ────────────────────────────────────────
+        public enum RobotType { Fanuc, Kuka, Abb }
 
         /// <summary>
-        /// Reads all robot poses from a WeldOperation path.
-        /// Robot is extracted automatically from the path.
+        /// Calculates J2-3 angle based on robot type.
         /// </summary>
-        public static List<RobotPose> ReadPosesFromProgram(TxWeldOperation program)
+        public static double CalculateJ23Angle(RobotPose pose, RobotType robotType)
         {
-            var poses = new List<RobotPose>();
-
-            // Try to get robot from path
-            TxRobot robot = null;
-            try
+            switch (robotType)
             {
-                robot = program.Robot as TxRobot;
+                case RobotType.Fanuc:
+                    return pose.J2 + pose.J3 + 90.0;
+                case RobotType.Kuka:
+                    return (-1.0) * pose.J3 + 180.0;
+                case RobotType.Abb:
+                    return (-1.0) * pose.J3 + 90.0;
+                default:
+                    return pose.J2 + pose.J3 + 90.0;
             }
-            catch { }
+        }
 
-            // If not found on path, try parent operation
-            if (robot == null)
+        /// <summary>
+        /// Normalizes an angle to ±180° (shortest arc).
+        /// ΔA = ((Δ+180) mod 360) − 180
+        /// Example: −300° → ((−300+180) mod 360) − 180 = 240 − 180 = +60°
+        /// </summary>
+        public static double NormalizeAngle180(double angle)
+        {
+            double a = (angle + 180.0) % 360.0;
+            if (a < 0) a += 360.0;   // C# modulo lehet negatív
+            return a - 180.0;
+        }
+
+        /// <summary>
+        /// Calculates J2-3 range (max - min) for a list of poses.
+        /// </summary>
+        public static double CalculateJ23Range(List<RobotPose> poses, RobotType robotType)
+        {
+            if (poses.Count == 0) return 0.0;
+
+            double min = double.MaxValue;
+            double max = double.MinValue;
+
+            foreach (var p in poses)
             {
-                try
-                {
-                    var parent = program.Collection as TxWeldOperation;
-                    if (parent != null)
-                        robot = parent.Robot as TxRobot;
-                }
-                catch { }
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle < min) min = angle;
+                if (angle > max) max = angle;
             }
 
-            if (robot == null) return poses;
+            return max - min;
+        }
 
-            // Get all location operations
-            var elements = program.GetAllDescendants(
+        /// <summary>
+        /// Result of nearest TC point search for one body point.
+        /// </summary>
+        public class NearestTcResult
+        {
+            public RobotPose BodyPose { get; set; }
+            public RobotPose NearestTcPose { get; set; }
+            public double Distance { get; set; }
+        }
+
+        /// <summary>
+        /// Summary statistics for a list of poses.
+        /// </summary>
+        public class PoseSummary
+        {
+            public double J1_Min { get; set; }
+            public double J1_Max { get; set; }
+            public double J2_Min { get; set; }
+            public double J2_Max { get; set; }
+            public double J3_Min { get; set; }
+            public double J3_Max { get; set; }
+            public double J4_Min { get; set; }
+            public double J4_Max { get; set; }
+            public double J5_Min { get; set; }
+            public double J5_Max { get; set; }
+            public double J6_Min { get; set; }
+            public double J6_Max { get; set; }
+            public int J5_NegCount { get; set; }
+            public int J5_PosCount { get; set; }
+        }
+
+        // ── Weights for Euclidean distance ────────────────────────
+        private const double W_J23 = 2.0;   // J2-3 domináns
+        private const double W_J4 = 1.0;
+        private const double W_J5 = 1.0;
+        private const double W_J6 = 1.0;
+
+        // ── PS API helper ─────────────────────────────────────────
+
+        public static List<RobotPose> ReadPosesFromProgram(
+          TxWeldOperation prog,
+    TxRobot robot,
+    string[] namePrefixes = null)  // null = nincs szűrés
+        {
+            var result = new List<RobotPose>();
+            var locations = prog.GetAllDescendants(
                 new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
-            if (elements == null) return poses;
 
-            foreach (ITxObject obj in elements)
+            foreach (ITxObject obj in locations)
             {
                 var loc = obj as ITxRoboticLocationOperation;
                 if (loc == null) continue;
 
+                // Szűrés – ha van prefix megadva
+                if (namePrefixes != null)
+                {
+                    if (!MeasurementPointFilter.IsMeasurementPoint(loc, namePrefixes))
+                        continue;
+                }
+
                 try
                 {
-                    TxPoseData pose = robot.GetPoseAtLocation(loc);
-                    if (pose == null) continue;
+                    var poseData = robot.GetPoseAtLocation(loc);
+                    if (poseData?.JointValues == null) continue;
 
-                    ArrayList joints = pose.JointValues;
-                    if (joints == null || joints.Count < 6) continue;
+                    var joints = poseData.JointValues;
+                    if (joints.Count < 6) continue;
 
-                    poses.Add(new RobotPose
+                    result.Add(new RobotPose
                     {
                         Name = loc.Name,
-                        J1 = Convert.ToDouble(joints[0]),
-                        J2 = Convert.ToDouble(joints[1]),
-                        J3 = Convert.ToDouble(joints[2]),
-                        J4 = Convert.ToDouble(joints[3]),
-                        J5 = Convert.ToDouble(joints[4]),
-                        J6 = Convert.ToDouble(joints[5])
+                        J1 = (double)joints[0] * (180.0 / Math.PI),
+                        J2 = (double)joints[1] * (180.0 / Math.PI),
+                        J3 = (double)joints[2] * (180.0 / Math.PI),
+                        J4 = (double)joints[3] * (180.0 / Math.PI),
+                        J5 = (double)joints[4] * (180.0 / Math.PI),
+                        J6 = (double)joints[5] * (180.0 / Math.PI),
                     });
                 }
                 catch { }
             }
-
-            return poses;
+            return result;
         }
 
-        // ── Criterion 1: J2-J3 Max Coverage ──────────────────────
+        // ── Summary statistics ────────────────────────────────────
+
+        public static PoseSummary CalculateSummary(List<RobotPose> poses)
+        {
+            var s = new PoseSummary
+            {
+                J1_Min = double.MaxValue,
+                J1_Max = double.MinValue,
+                J2_Min = double.MaxValue,
+                J2_Max = double.MinValue,
+                J3_Min = double.MaxValue,
+                J3_Max = double.MinValue,
+                J4_Min = double.MaxValue,
+                J4_Max = double.MinValue,
+                J5_Min = double.MaxValue,
+                J5_Max = double.MinValue,
+                J6_Min = double.MaxValue,
+                J6_Max = double.MinValue,
+            };
+
+            foreach (var p in poses)
+            {
+                if (p.J1 < s.J1_Min) s.J1_Min = p.J1;
+                if (p.J1 > s.J1_Max) s.J1_Max = p.J1;
+                if (p.J2 < s.J2_Min) s.J2_Min = p.J2;
+                if (p.J2 > s.J2_Max) s.J2_Max = p.J2;
+                if (p.J3 < s.J3_Min) s.J3_Min = p.J3;
+                if (p.J3 > s.J3_Max) s.J3_Max = p.J3;
+                if (p.J4 < s.J4_Min) s.J4_Min = p.J4;
+                if (p.J4 > s.J4_Max) s.J4_Max = p.J4;
+                if (p.J5 < s.J5_Min) s.J5_Min = p.J5;
+                if (p.J5 > s.J5_Max) s.J5_Max = p.J5;
+                if (p.J6 < s.J6_Min) s.J6_Min = p.J6;
+                if (p.J6 > s.J6_Max) s.J6_Max = p.J6;
+                if (p.J5 < 0) s.J5_NegCount++;
+                else if (p.J5 > 0) s.J5_PosCount++;
+            }
+
+            return s;
+        }
+
+        // ── Criterion 1: J2-J3 Coverage ──────────────────────────
 
         public class CoverageResult
         {
@@ -139,8 +244,91 @@ namespace ISRA.Calculations.TempComp
                 IsValid = j2ok && j3ok
             };
         }
+        // ── Criterion: J2-3 Angle Max/Min Coverage ────────────────
 
-        // ── Criterion 2: J2-J3 Angular Spread ────────────────────
+        public class J23AngleCoverageResult
+        {
+            public double BodyMax { get; set; }
+            public double BodyMin { get; set; }
+            public int CountMax { get; set; }
+            public int CountMin { get; set; }
+            public bool MaxOK { get; set; }
+            public bool MinOK { get; set; }
+        }
+
+        public static J23AngleCoverageResult CheckJ23AngleCoverage(
+            List<RobotPose> bodyPoses,
+            List<RobotPose> tempCompPoses,
+            RobotType robotType)
+        {
+            double bodyMax = double.MinValue;
+            double bodyMin = double.MaxValue;
+
+            foreach (var p in bodyPoses)
+            {
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle > bodyMax) bodyMax = angle;
+                if (angle < bodyMin) bodyMin = angle;
+            }
+
+            int countMax = 0, countMin = 0;
+            foreach (var p in tempCompPoses)
+            {
+                double angle = CalculateJ23Angle(p, robotType);
+                if (angle >= bodyMax) countMax++;
+                if (angle <= bodyMin) countMin++;
+            }
+
+            return new J23AngleCoverageResult
+            {
+                BodyMax = bodyMax,
+                BodyMin = bodyMin,
+                CountMax = countMax,
+                CountMin = countMin,
+                MaxOK = countMax >= 2,
+                MinOK = countMin >= 2
+            };
+        }
+
+        // ── Criterion: J4/J5/J6 Max/Min individual ───────────────
+
+        public class AxisCoverageResult
+        {
+            public double BodyMax { get; set; }
+            public double TcMax { get; set; }
+            public bool IsValid { get; set; }
+        }
+
+        public static AxisCoverageResult CheckAxisMaxCoverage(
+            List<RobotPose> bodyPoses,
+            List<RobotPose> tempCompPoses,
+            Func<RobotPose, double> selector)
+        {
+            double bodyMax = double.MinValue;
+            foreach (var p in bodyPoses)
+            {
+                double v = Math.Abs(selector(p));
+                if (v > bodyMax) bodyMax = v;
+            }
+
+            double tcMax = double.MinValue;
+            bool covered = false;
+            foreach (var p in tempCompPoses)
+            {
+                double v = Math.Abs(selector(p));
+                if (v > tcMax) tcMax = v;
+                if (v >= bodyMax) covered = true;
+            }
+
+            return new AxisCoverageResult
+            {
+                BodyMax = bodyMax,
+                TcMax = tcMax,
+                IsValid = covered
+            };
+        }
+
+        // ── Criterion 2: J2-J3 Spread ────────────────────────────
 
         public class SpreadResult
         {
@@ -166,7 +354,6 @@ namespace ISRA.Calculations.TempComp
 
             double spreadJ2 = maxJ2 - minJ2;
             double spreadJ3 = maxJ3 - minJ3;
-
             bool j2ok = spreadJ2 >= 75.0;
             bool j3ok = spreadJ3 >= 75.0;
 
@@ -248,7 +435,7 @@ namespace ISRA.Calculations.TempComp
                 foreach (var p in tempCompPoses)
                     if (p.J2 >= s && p.J2 < end) { covered = true; break; }
                 if (!covered)
-                    j2gaps.Add(string.Format("{0:F0} to {1:F0} deg", s, end));
+                    j2gaps.Add(string.Format("{0:F0} to {1:F0}", s, end));
             }
 
             for (double s = minJ3; s < maxJ3; s += stepSizeDeg)
@@ -258,7 +445,7 @@ namespace ISRA.Calculations.TempComp
                 foreach (var p in tempCompPoses)
                     if (p.J3 >= s && p.J3 < end) { covered = true; break; }
                 if (!covered)
-                    j3gaps.Add(string.Format("{0:F0} to {1:F0} deg", s, end));
+                    j3gaps.Add(string.Format("{0:F0} to {1:F0}", s, end));
             }
 
             return new StepCoverageResult
@@ -271,7 +458,7 @@ namespace ISRA.Calculations.TempComp
             };
         }
 
-        // ── Criterion 5: J4, J5, J6 Max Coverage ─────────────────
+        // ── Criterion 5: J4/J5/J6 Max Coverage ───────────────────
 
         public class MaxCoverageResult
         {
@@ -302,7 +489,6 @@ namespace ISRA.Calculations.TempComp
             }
 
             bool j4ok = false, j5posok = false, j5negok = false, j6ok = false;
-
             foreach (var p in tempCompPoses)
             {
                 if (Math.Abs(p.J4) >= maxJ4) j4ok = true;
@@ -322,6 +508,67 @@ namespace ISRA.Calculations.TempComp
                 J6_OK = j6ok,
                 IsValid = j4ok && j5posok && j5negok && j6ok
             };
+        }
+
+        // ── Nearest TC Point (Euclidean distance) ─────────────────
+
+        /// <summary>
+        /// Normalizes J4/J6 difference for 360° rotational axes.
+        /// </summary>
+        private static double NormalizeAngleDiff(double diff)
+        {
+            diff = Math.Abs(diff) % 360.0;
+            if (diff > 180.0) diff = 360.0 - diff;
+            return diff;
+        }
+
+        /// <summary>
+        /// Distance between two poses: Euclidean over (ΔJ2-3, ΔJ4, ΔJ5, ΔJ6).
+        /// J4/J6 differences normalized to ±180° (shortest arc).
+        /// </summary>
+        public static double CalculateDistance(RobotPose a, RobotPose b, RobotType robotType)
+        {
+            double d23 = CalculateJ23Angle(a, robotType) - CalculateJ23Angle(b, robotType);
+            double d4 = NormalizeAngle180(a.J4 - b.J4);
+            double d5 = a.J5 - b.J5;
+            double d6 = NormalizeAngle180(a.J6 - b.J6);
+
+            return Math.Sqrt(
+                W_J23 * d23 * d23 +
+                W_J4 * d4 * d4 +
+                W_J5 * d5 * d5 +
+                W_J6 * d6 * d6);
+        }
+
+        public static List<NearestTcResult> FindNearestTcPoints(
+            List<RobotPose> bodyPoses, List<RobotPose> tempCompPoses, RobotType robotType)
+        {
+            var results = new List<NearestTcResult>();
+
+            foreach (var body in bodyPoses)
+            {
+                RobotPose nearest = null;
+                double minDist = double.MaxValue;
+
+                foreach (var tc in tempCompPoses)
+                {
+                    double dist = CalculateDistance(body, tc, robotType);
+                    if (dist < minDist)
+                    {
+                        minDist = dist;
+                        nearest = tc;
+                    }
+                }
+
+                results.Add(new NearestTcResult
+                {
+                    BodyPose = body,
+                    NearestTcPose = nearest,
+                    Distance = minDist
+                });
+            }
+
+            return results;
         }
     }
 }
