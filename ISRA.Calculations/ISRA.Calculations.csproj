@@ -53,14 +53,32 @@
     <Compile Include="Accusite\CollisionCheck.cs" />
     <Compile Include="Accusite\GeometryCalculations.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TempComp\Domain\Results\NearestTcResult.cs" />
+    <Compile Include="TempComp\Domain\Results\PoseStatistics.cs" />
+    <Compile Include="TempComp\Domain\RobotPose.cs" />
+    <Compile Include="TempComp\Domain\TempCompValidationInput.cs" />
     <Compile Include="TempComp\MeasurementPointFilter.cs" />
+    <Compile Include="TempComp\RobotConfiguration\AbbConfiguration.cs" />
+    <Compile Include="TempComp\RobotConfiguration\FanucConfiguration.cs" />
+    <Compile Include="TempComp\RobotConfiguration\IRobotConfiguration.cs" />
+    <Compile Include="TempComp\RobotConfiguration\KukaConfiguration.cs" />
+    <Compile Include="TempComp\Services\DistanceCalculator.cs" />
+    <Compile Include="TempComp\Services\PoseReader.cs" />
+    <Compile Include="TempComp\Services\PoseStatisticsCalculator.cs" />
+    <Compile Include="TempComp\Services\TempCompAnalyzer.cs" />
     <Compile Include="TempComp\TempCompCalculations.cs" />
+    <Compile Include="TempComp\Validators\AxisMaxCoverageValidator.cs" />
+    <Compile Include="TempComp\Validators\J23AngleCoverageValidator.cs" />
+    <Compile Include="TempComp\Validators\J23RangeValidator.cs" />
+    <Compile Include="TempComp\Validators\J5SymmetryValidator.cs" />
+    <Compile Include="TempComp\Validators\TempCompValidator.cs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\ISRA.Components\ISRA.Components.csproj">
       <Project>{006ca160-0ab3-4a01-8305-b7bf26f7847c}</Project>
       <Name>ISRA.Components</Name>
     </ProjectReference>
+    <ProjectReference Include="..\ISRA.Core\ISRA.Core.csproj" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

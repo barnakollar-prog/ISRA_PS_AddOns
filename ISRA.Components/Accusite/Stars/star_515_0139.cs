@@ -8,26 +8,17 @@ namespace ISRA.Components.AccuSite.Stars
     /// LED center offset: (0, 0, 4mm) from self origin.
     /// 4 emitters with individual positions and orientations.
     /// </summary>
-    public static class star_515_0139
+    public class Star515_0139 : IStar
     {
         // ── LED center offset ─────────────────────────────────────
         private static readonly TxVector LedOffset = new TxVector(0, 0, 4);
 
-        // ── Emitter definitions ───────────────────────────────────
-        // Position relative to star self origin (mm)
-        // Rotation in degrees (Rx, Ry, Rz) → used to compute Z vector
-
-        public class EmitterData
-        {
-            public string Name { get; set; }
-            public TxVector Position { get; set; } // local to star origin
-            public TxVector ZVector { get; set; } // emitter Z direction in star local
-        }
+        // ── IStar implementation ──────────────────────────────────
 
         /// <summary>
         /// Returns the 4 emitter definitions in star local coordinate system.
         /// </summary>
-        public static EmitterData[] GetEmitters()
+        public EmitterData[] GetEmitters()
         {
             return new EmitterData[]
             {
@@ -61,7 +52,7 @@ namespace ISRA.Components.AccuSite.Stars
         /// <summary>
         /// Returns the LED world position from a star locatable object.
         /// </summary>
-        public static TxVector GetLedWorldPosition(ITxLocatableObject starLoc)
+        public TxVector GetLedWorldPosition(ITxLocatableObject starLoc)
         {
             TxTransformation starWorld = starLoc.AbsoluteLocation;
             return starWorld.Transform(LedOffset);
@@ -70,7 +61,7 @@ namespace ISRA.Components.AccuSite.Stars
         /// <summary>
         /// Returns the world position of a specific emitter.
         /// </summary>
-        public static TxVector GetEmitterWorldPosition(
+        public TxVector GetEmitterWorldPosition(
             ITxLocatableObject starLoc, EmitterData emitter)
         {
             TxTransformation starWorld = starLoc.AbsoluteLocation;
@@ -80,7 +71,7 @@ namespace ISRA.Components.AccuSite.Stars
         /// <summary>
         /// Returns the world Z vector of a specific emitter.
         /// </summary>
-        public static TxVector GetEmitterWorldZVector(
+        public TxVector GetEmitterWorldZVector(
             ITxLocatableObject starLoc, EmitterData emitter)
         {
             TxTransformation starWorld = starLoc.AbsoluteLocation;
@@ -131,5 +122,25 @@ namespace ISRA.Components.AccuSite.Stars
 
             return new TxVector(x, y, z);
         }
+    }
+
+    /// <summary>
+    /// Backward compatibility: static wrapper for star_515_0139.
+    /// Legacy code can continue using star_515_0139.GetEmitters() etc.
+    /// </summary>
+    public static class star_515_0139
+    {
+        private static readonly Star515_0139 _instance = new Star515_0139();
+
+        public static EmitterData[] GetEmitters() => _instance.GetEmitters();
+
+        public static TxVector GetLedWorldPosition(ITxLocatableObject starLoc)
+            => _instance.GetLedWorldPosition(starLoc);
+
+        public static TxVector GetEmitterWorldPosition(ITxLocatableObject starLoc, EmitterData emitter)
+            => _instance.GetEmitterWorldPosition(starLoc, emitter);
+
+        public static TxVector GetEmitterWorldZVector(ITxLocatableObject starLoc, EmitterData emitter)
+            => _instance.GetEmitterWorldZVector(starLoc, emitter);
     }
 }

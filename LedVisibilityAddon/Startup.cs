@@ -56,7 +56,7 @@ namespace LedVisibilityAddon
             = new List<ITxDisplayableObject>();
         private TxComponent _triangleComponent = null;
         private TxComponent _emitterComponent = null;
-        private readonly tracker_920_0005 _trackerFov = new tracker_920_0005();
+        private readonly Tracker920_0005 _trackerFov = new Tracker920_0005();
 
         private static readonly TxColor ColorHighlight = new TxColor(255, 200, 0);
         private static readonly TxColor ColorOK = new TxColor(0, 200, 0);
@@ -450,7 +450,7 @@ namespace LedVisibilityAddon
                 var losResult = CollisionCheck.CheckLineOfSight(
                     starLoc, trackerWorld, _cylinderComponents);
 
-                bool starOK = zone != tracker_920_0005.PositionZone.NOK &&
+                bool starOK = zone != PositionZone.NOK &&
                               emitterResult.IsValid &&
                               losResult.IsValid;
                 // Color in PS
@@ -460,10 +460,10 @@ namespace LedVisibilityAddon
                     try
                     {
                         TxColor col;
-                        if (zone == tracker_920_0005.PositionZone.NOK ||
+                        if (zone == PositionZone.NOK ||
                             !emitterResult.IsValid)
                             col = ColorNOK;
-                        else if (zone == tracker_920_0005.PositionZone.Warning)
+                        else if (zone == PositionZone.Warning)
                             col = ColorWarn;
                         else
                             col = ColorOK;
@@ -487,9 +487,9 @@ namespace LedVisibilityAddon
                 headerItem.SubItems.Add(string.Format("{0:F0}", localPt.Z));
                 headerItem.SubItems.Add(_trackerFov.GetZoneName(localPt));
                 headerItem.SubItems.Add(zoneLabel);
-                headerItem.BackColor = zone == tracker_920_0005.PositionZone.NOK
+                headerItem.BackColor = zone == PositionZone.NOK
                     ? Color.LightCoral
-                    : zone == tracker_920_0005.PositionZone.Warning
+                    : zone == PositionZone.Warning
                         ? Color.LightYellow
                         : Color.LightGreen;
                 lstResults.Items.Add(headerItem);
@@ -748,7 +748,7 @@ namespace LedVisibilityAddon
                 var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
                     starLoc, trackerWorld, (double)nudMaxAngle.Value);
 
-                bool ok = zone != tracker_920_0005.PositionZone.NOK &&
+                bool ok = zone != PositionZone.NOK &&
                           emitterResult.IsValid;
 
                 rows.Add(new ExportRow
