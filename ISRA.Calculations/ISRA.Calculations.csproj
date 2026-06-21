@@ -51,7 +51,17 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Accusite\CollisionCheck.cs" />
+    <Compile Include="Accusite\Domain\Results\EmitterVisibilityResult.cs" />
+    <Compile Include="Accusite\Domain\Results\LineOfSightResult.cs" />
+    <Compile Include="Accusite\Domain\Results\StarEmitterVisibilityResult.cs" />
+    <Compile Include="Accusite\Domain\Results\StarLineOfSightResult.cs" />
+    <Compile Include="Accusite\Domain\Results\StarTrackerAngleResult.cs" />
+    <Compile Include="Accusite\Domain\Results\TriangleResult.cs" />
+    <Compile Include="Accusite\Domain\VisibilityAnalysisInput.cs" />
     <Compile Include="Accusite\GeometryCalculations.cs" />
+    <Compile Include="Accusite\Services\VisibilityAnalyzer.cs" />
+    <Compile Include="Accusite\Validators\AccuSiteValidator.cs" />
+    <Compile Include="Accusite\Validators\EmitterVisibilityValidator.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TempComp\Domain\Results\NearestTcResult.cs" />
     <Compile Include="TempComp\Domain\Results\PoseStatistics.cs" />
