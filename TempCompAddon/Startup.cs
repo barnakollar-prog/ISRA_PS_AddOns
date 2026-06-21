@@ -5,6 +5,11 @@ using System.Windows.Forms;
 using Tecnomatix.Engineering;
 using Tecnomatix.Engineering.Ui;
 using ISRA.Calculations.TempComp;
+using ISRA.Calculations.TempComp.Domain;
+using ISRA.Calculations.TempComp.Domain.Results;
+using ISRA.Calculations.TempComp.RobotConfiguration;
+using ISRA.Core.Domain;
+using TempCompAddon.Presentation;
 
 namespace TempCompAddon
 {
@@ -30,8 +35,12 @@ namespace TempCompAddon
         }
     }
 
-    public class TempCompForm : TxForm
+    public class TempCompForm : TxForm, ITempCompView
     {
+        // ── MVP ───────────────────────────────────────────────────
+        private readonly TempCompPresenter _presenter;
+        private readonly TempCompReportFormatter _formatter;
+
         // ── Controls ──────────────────────────────────────────────
         private TxObjEditBoxCtrl pickerRobot;
         private ListView lstBodyPaths;
@@ -64,6 +73,9 @@ namespace TempCompAddon
 
         public TempCompForm()
         {
+            _presenter = new TempCompPresenter(this);
+            _formatter = new TempCompReportFormatter();
+
             this.SemiModal = false;
             this.ShouldAutoPosition = true;
             this.ShouldCloseOnDocumentUnloading = true;
@@ -543,298 +555,45 @@ namespace TempCompAddon
         // ── Analyze ───────────────────────────────────────────────
         private void OnAnalyze(object sender, EventArgs e)
         {
-            if (_bodyPrograms.Count == 0)
-            {
-                MessageBox.Show("Please select at least one Bodypart Path.",
-                    "Missing Input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-            if (_tempCompPrograms.Count == 0)
-            {
-                MessageBox.Show("Please select at least one Temp Comp Path.",
-                    "Missing Input", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var robot = pickerRobot.Object as TxRobot;
-            if (robot == null)
-            {
-                MessageBox.Show("Please select a Robot.", "Missing Input",
-                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            // Robot type
-            TempCompCalculations.RobotType robotType = TempCompCalculations.RobotType.Fanuc;
-            if (rbKuka.Checked) robotType = TempCompCalculations.RobotType.Kuka;
-            else if (rbAbb.Checked) robotType = TempCompCalculations.RobotType.Abb;
-
-            // Read poses
-            var bodyPoses = new List<TempCompCalculations.RobotPose>();
-            foreach (var prog in _bodyPrograms)
-                bodyPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(
-                    prog, robot, MeasurementPointFilter.BodyPrefixes));
-
-            var tempCompPoses = new List<TempCompCalculations.RobotPose>();
-            foreach (var prog in _tempCompPrograms)
-                tempCompPoses.AddRange(TempCompCalculations.ReadPosesFromProgram(
-                    prog, robot, MeasurementPointFilter.TcPrefixes));
-
-            if (bodyPoses.Count == 0)
-            {
-                MessageBox.Show("No poses found in Bodypart Paths.", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-            if (tempCompPoses.Count == 0)
-            {
-                MessageBox.Show("No poses found in Temp Comp Paths.", "Error",
-                    MessageBoxButtons.OK, MessageBoxIcon.Error);
-                return;
-            }
-
-            double threshold = (double)nudStepSize.Value;
-
-            // Run criteria
-            var j23 = TempCompCalculations.CheckJ23AngleCoverage(bodyPoses, tempCompPoses, robotType);
-            var c2 = TempCompCalculations.CheckJ2J3Spread(tempCompPoses);
-            var c3 = TempCompCalculations.CheckJ5Symmetry(tempCompPoses);
-            var j4 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses,
-            p => TempCompCalculations.NormalizeAngle180(p.J4));
-            var j5 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses, p => p.J5);
-            var j6 = TempCompCalculations.CheckAxisMaxCoverage(bodyPoses, tempCompPoses,
-            p => TempCompCalculations.NormalizeAngle180(p.J6));
-
-            double tcJ23Range = TempCompCalculations.CalculateJ23Range(tempCompPoses, robotType);
-            bool j23RangeOK = tcJ23Range >= 75.0;
-
-
-
-
-
-            // ── Tab 1: Validation ─────────────────────────────────
-            lstValidation.Items.Clear();
-
-            AddValidationRow("J2-J3 Angle Max.",
-                string.Format("{0:F2} deg", j23.BodyMax),
-                string.Format("{0} TC pts >= body max", j23.CountMax),
-                "Min 2 TC pts >= body max",
-                j23.MaxOK);
-
-            AddValidationRow("J2-J3 Angle Min.",
-                string.Format("{0:F2} deg", j23.BodyMin),
-                string.Format("{0} TC pts <= body min", j23.CountMin),
-                "Min 2 TC pts <= body min",
-                j23.MinOK);
-
-            AddValidationRow("J2-3 Range > 75°",
-                string.Format("{0:F2} deg", TempCompCalculations.CalculateJ23Range(bodyPoses, robotType)),
-                string.Format("{0:F2} deg", tcJ23Range),
-                "TC range >= 75 deg",
-                j23RangeOK);
-
-            AddValidationRow("J5 Symmetry",
-                "",
-                string.Format("Neg: {0} / Pos: {1}", c3.NegCount, c3.PosCount),
-                string.Format("Total: {0} pts", c3.Total),
-                c3.IsValid);
-
-            AddValidationRow("J4 Max",
-                string.Format("{0:F2} deg", j4.BodyMax),
-                string.Format("{0:F2} deg", j4.TcMax),
-                "TC max >= body max",
-                j4.IsValid);
-
-            AddValidationRow("J5 Max",
-                string.Format("{0:F2} deg", j5.BodyMax),
-                string.Format("{0:F2} deg", j5.TcMax),
-                "TC max >= body max",
-                j5.IsValid);
-
-            AddValidationRow("J6 Max",
-                string.Format("{0:F2} deg", j6.BodyMax),
-                string.Format("{0:F2} deg", j6.TcMax),
-                "TC max >= body max",
-                j6.IsValid);
-
-
-
-            // ── Tab 2: Nearest TC ─────────────────────────────────
-            lstNearestTc.Items.Clear();
-            var nearest = TempCompCalculations.FindNearestTcPoints(bodyPoses, tempCompPoses, robotType);
-            foreach (var r in nearest)
-            {
-                var b = r.BodyPose;
-                var t = r.NearestTcPose;
-
-                var item = new ListViewItem(b.Name);
-                item.UseItemStyleForSubItems = false;
-
-                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.CalculateJ23Angle(b, robotType)));
-                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(b.J4)));
-                item.SubItems.Add(string.Format("{0:F2}", b.J5));
-                item.SubItems.Add(string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(b.J6)));
-
-                if (t != null)
-                {
-                    double d23 = TempCompCalculations.CalculateJ23Angle(t, robotType)
-                               - TempCompCalculations.CalculateJ23Angle(b, robotType);
-                    double d4 = TempCompCalculations.NormalizeAngle180(t.J4 - b.J4);
-                    double d5 = t.J5 - b.J5;
-                    double d6 = TempCompCalculations.NormalizeAngle180(t.J6 - b.J6);
-
-                    item.SubItems.Add(t.Name);
-
-                    var s23 = item.SubItems.Add(string.Format("{0:F2}",
-                        TempCompCalculations.CalculateJ23Angle(t, robotType)));
-                    s23.BackColor = DiffColor(d23, threshold);
-
-                    var s4 = item.SubItems.Add(string.Format("{0:F2}",
-                        TempCompCalculations.NormalizeAngle180(t.J4)));
-                    s4.BackColor = DiffColor(d4, threshold);
-
-                    var s5 = item.SubItems.Add(string.Format("{0:F2}", t.J5));
-                    s5.BackColor = DiffColor(d5, threshold);
-
-                    var s6 = item.SubItems.Add(string.Format("{0:F2}",
-                        TempCompCalculations.NormalizeAngle180(t.J6)));
-                    s6.BackColor = DiffColor(d6, threshold);
-
-                    double maxDiff = Math.Max(Math.Max(Math.Abs(d23), Math.Abs(d4)),
-                                              Math.Max(Math.Abs(d5), Math.Abs(d6)));
-
-                    var sd = item.SubItems.Add(string.Format("{0:F2}", maxDiff));
-                    sd.BackColor = DiffColor(maxDiff, threshold);
-                }
-                else
-                {
-                    item.SubItems.Add("N/A");
-                    for (int k = 0; k < 5; k++) item.SubItems.Add("-");
-                }
-
-                lstNearestTc.Items.Add(item);
-            }
-            foreach (ColumnHeader col in lstNearestTc.Columns)
-                col.Width = -2;
-
-            // ── Tab 3: Raw Data ───────────────────────────────────
-            lstRawData.Items.Clear();
-
-            // Body J2-3 envelope
-            double bodyMax23 = double.MinValue, bodyMin23 = double.MaxValue;
-            foreach (var b in bodyPoses)
-            {
-                double a = TempCompCalculations.CalculateJ23Angle(b, robotType);
-                if (a > bodyMax23) bodyMax23 = a;
-                if (a < bodyMin23) bodyMin23 = a;
-            }
-
-            // TC J2-3: 2 legnagyobb és 2 legkisebb érték keresése
-            double tcMax1 = double.MinValue, tcMax2 = double.MinValue;
-            double tcMin1 = double.MaxValue, tcMin2 = double.MaxValue;
-            foreach (var t in tempCompPoses)
-            {
-                double a = TempCompCalculations.CalculateJ23Angle(t, robotType);
-                if (a > tcMax1) { tcMax2 = tcMax1; tcMax1 = a; }
-                else if (a > tcMax2) tcMax2 = a;
-                if (a < tcMin1) { tcMin2 = tcMin1; tcMin1 = a; }
-                else if (a < tcMin2) tcMin2 = a;
-            }
-
-            int maxRows = Math.Max(bodyPoses.Count, tempCompPoses.Count);
-            for (int i = 0; i < maxRows; i++)
-            {
-                var body = i < bodyPoses.Count ? bodyPoses[i] : null;
-                var tc = i < tempCompPoses.Count ? tempCompPoses[i] : null;
-
-                var item = new ListViewItem(body != null ? body.Name : "");
-                item.UseItemStyleForSubItems = false;
-
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
-                item.SubItems.Add(body != null
-                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J4)) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
-                item.SubItems.Add(body != null
-                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(body.J6)) : "");
-
-                // Body J2-3 cella: max = zöld, min = világoskék
-                if (body != null)
-                {
-                    double bodyA = TempCompCalculations.CalculateJ23Angle(body, robotType);
-                    var sub = item.SubItems.Add(string.Format("{0:F2}", bodyA));
-                    if (bodyA == bodyMax23)
-                        sub.BackColor = Color.LightGreen;
-                    else if (bodyA == bodyMin23)
-                        sub.BackColor = Color.LightBlue;
-                }
-                else item.SubItems.Add("");
-
-                item.SubItems.Add(tc != null ? tc.Name : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
-                item.SubItems.Add(tc != null
-                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J4)) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
-                item.SubItems.Add(tc != null
-                    ? string.Format("{0:F2}", TempCompCalculations.NormalizeAngle180(tc.J6)) : "");
-
-                // TC J2-3 cella: csak a 2 legnagyobb / 2 legkisebb kap színt
-                if (tc != null)
-                {
-                    double tcA = TempCompCalculations.CalculateJ23Angle(tc, robotType);
-                    var sub = item.SubItems.Add(string.Format("{0:F2}", tcA));
-
-                    if (tcA >= tcMax2)                       // a 2 legnagyobb közé tartozik
-                    {
-                        if (tcA >= bodyMax23)
-                            sub.BackColor = Color.LightGreen;     // lefedi a body max-ot
-                        else if (bodyMax23 - tcA < threshold)
-                            sub.BackColor = Color.Gold;           // közel, de nem elég
-                        else
-                            sub.BackColor = Color.LightCoral;     // messze van
-                    }
-                    else if (tcA <= tcMin2)                  // a 2 legkisebb közé tartozik
-                    {
-                        if (tcA <= bodyMin23)
-                            sub.BackColor = Color.LightBlue;      // lefedi a body min-t
-                        else if (tcA - bodyMin23 < threshold)
-                            sub.BackColor = Color.Gold;
-                        else
-                            sub.BackColor = Color.LightCoral;
-                    }
-                    // többi pont: nincs szín
-                }
-                else item.SubItems.Add("");
-
-                lstRawData.Items.Add(item);
-            }
-
-            foreach (ColumnHeader col in lstRawData.Columns)
-                col.Width = -2;
-
+            _presenter.Analyze();
         }
+
+        // ── ITempCompView Implementation ──────────────────────────
+        public List<TxWeldOperation> BodyPrograms => _bodyPrograms;
+        public List<TxWeldOperation> TempCompPrograms => _tempCompPrograms;
+        public TxRobot SelectedRobot => pickerRobot.Object as TxRobot;
+        public string SelectedRobotType
+        {
+            get
+            {
+                if (rbKuka.Checked) return "Kuka";
+                if (rbAbb.Checked) return "ABB";
+                return "Fanuc";
+            }
+        }
+        public double MaxAngleThreshold => (double)nudStepSize.Value;
+
+        public void DisplayValidationResults(AnalysisReport report)
+        {
+            _formatter.FormatValidationResults(report, lstValidation);
+        }
+
+        public void DisplayNearestTcResults(List<NearestTcResult> results, double threshold, IRobotConfiguration config)
+        {
+            _formatter.FormatNearestTcResults(results, lstNearestTc, threshold, config);
+        }
+
+        public void DisplayRawData(List<RobotPose> bodyPoses, List<RobotPose> tcPoses, IRobotConfiguration config, double threshold)
+        {
+            _formatter.FormatRawData(bodyPoses, tcPoses, lstRawData, config, threshold);
+        }
+
+        public void ShowError(string message, string title)
+        {
+            MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
         // ── Helpers ───────────────────────────────────────────────
-        private void AddValidationRow(string criterion,
-            string j2val, string j3val, string details, bool ok)
-        {
-            var item = new ListViewItem(criterion);
-            item.SubItems.Add(j2val);
-            item.SubItems.Add(j3val);
-            item.SubItems.Add(details);
-            item.SubItems.Add(ok ? "OK" : "NOK");
-            item.BackColor = ok ? Color.LightGreen : Color.LightCoral;
-            lstValidation.Items.Add(item);
-        }
-        private Color DiffColor(double diff, double t)
-        {
-            diff = Math.Abs(diff);
-            if (diff < t) return Color.LightGreen;   // < 35
-            if (diff < 2 * t) return Color.Gold;         // 35–70
-            return Color.LightCoral;                       // > 70
-        }
 
 
         private void OnRobotPicked(object sender, TxObjEditBoxCtrl_PickedEventArgs e)
