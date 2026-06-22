@@ -39,7 +39,7 @@ This installer package includes:
 3. **For TempComp Validator:**
    - Click **"Browse"** and navigate to:
      ```
-     C:\Program Files\Tecnomatix_XXXX\eMPower\bin\TempCompAddon.dll
+     C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\TempComp\TempCompAddon.dll
      ```
    - Click **"Create File"** to generate the .xml registration file
      - (If updating an existing installation, select the existing .xml from the dropdown instead)
@@ -48,7 +48,7 @@ This installer package includes:
 4. **For LED Visibility Analyzer:**
    - Click **"Browse"** and navigate to:
      ```
-     C:\Program Files\Tecnomatix_XXXX\eMPower\bin\LedVisibilityAddon.dll
+     C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\Accusite\LedVisibilityAddon.dll
      ```
    - Click **"Create File"** to generate the .xml registration file
      - (If updating an existing installation, select the existing .xml from the dropdown instead)
@@ -149,10 +149,13 @@ To remove the add-ons:
 
 ## 📂 Installation Location
 
-By default, files are installed to:
+By default, files are installed to addon-specific subfolders:
 ```
-C:\Program Files\Tecnomatix\ProcessSimulate_XXXX\bin\
+C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\TempComp\
+C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\Accusite\
 ```
+
+Where `XXXX` is your version (2206.0, 2408.0, or 2502.0).
 
 ## 🔄 Updating to New Version
 

@@ -64,12 +64,12 @@ Two powerful add-ons for Process Simulate:
 2. **Right-click** `commandreg.exe` → **"Run as Administrator"**
 
 3. **Register TempComp Validator:**
-   - Browse to: `bin\TempCompAddon.dll`
+   - Browse to: `DotNetCommands\TempComp\TempCompAddon.dll`
    - Click **"Create File"** (generates .xml registration)
    - Click **"Register"**
 
 4. **Register LED Visibility Analyzer:**
-   - Browse to: `bin\LedVisibilityAddon.dll`
+   - Browse to: `DotNetCommands\Accusite\LedVisibilityAddon.dll`
    - Click **"Create File"** (generates .xml registration)
    - Click **"Register"**
 
@@ -114,12 +114,13 @@ Two powerful add-ons for Process Simulate:
 
 ## 📂 Installation Location
 
-Files are installed to:
+Files are installed to addon-specific subfolders:
 ```
-C:\Program Files\Tecnomatix\ProcessSimulate_XXXX\bin\
+C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\TempComp\
+C:\Program Files\Tecnomatix_XXXX\eMPower\DotNetCommands\Accusite\
 ```
 
-Where `XXXX` is your version (2206, 2408, or 2502).
+Where `XXXX` is your version (2206.0, 2408.0, or 2502.0).
 
 ---
 

@@ -20,6 +20,7 @@ $AddOns = @(
 		CommandName = "TempCompAnalyzer"
 		Description = "ISRA Temp Comp Validator"
 		ImageName = "TempCompIcon.png"
+		TargetSubfolder = "DotNetCommands\TempComp"
 	},
 	@{
 		Name = "LED Visibility Analyzer"
@@ -27,12 +28,12 @@ $AddOns = @(
 		CommandName = "LedVisibilityAnalyzer"
 		Description = "ISRA LED Visibility Analyzer"
 		ImageName = "LedVisibilityIcon.png"
+		TargetSubfolder = "DotNetCommands\Accusite"
 	}
 )
 
-$RequiredDlls = @(
-	"TempCompAddon.dll",
-	"LedVisibilityAddon.dll",
+# Shared DLLs that both addons need (copied to both folders)
+$SharedDlls = @(
 	"ISRA.Core.dll",
 	"ISRA.Components.dll",
 	"ISRA.Calculations.dll",
@@ -61,16 +62,17 @@ function Find-TecnomatixPath {
 	Write-ColorText "Searching for Tecnomatix installation..." Yellow
 
 	$CommonPaths = @(
-		"C:\Program Files\Tecnomatix\ProcessSimulate_2502\bin",
-		"C:\Program Files\Tecnomatix\ProcessSimulate_2408\bin",
-		"C:\Program Files\Tecnomatix\ProcessSimulate_2206\bin",
-		"C:\Program Files\Siemens\Tecnomatix\ProcessSimulate_2502\bin",
-		"C:\Program Files\Siemens\Tecnomatix\ProcessSimulate_2408\bin",
-		"C:\Program Files\Siemens\Tecnomatix\ProcessSimulate_2206\bin"
+		"C:\Program Files\Tecnomatix_2502.0\eMPower",
+		"C:\Program Files\Tecnomatix_2408.0\eMPower",
+		"C:\Program Files\Tecnomatix_2206.0\eMPower",
+		"C:\Program Files\Siemens\Tecnomatix_2502.0\eMPower",
+		"C:\Program Files\Siemens\Tecnomatix_2408.0\eMPower",
+		"C:\Program Files\Siemens\Tecnomatix_2206.0\eMPower"
 	)
 
 	foreach ($path in $CommonPaths) {
-		if (Test-Path "$path\TxApplication.exe") {
+		$binPath = Join-Path $path "bin\TxApplication.exe"
+		if (Test-Path $binPath) {
 			Write-ColorText "✓ Found: $path" Green
 			return $path
 		}
@@ -86,7 +88,10 @@ function Test-AdminPrivileges {
 }
 
 function Copy-AddonFiles {
-	param([string]$SourcePath, [string]$DestPath)
+	param(
+		[string]$SourcePath,
+		[string]$EmpowerPath
+	)
 
 	Write-ColorText "`nCopying add-on files..." Yellow
 
@@ -94,36 +99,64 @@ function Copy-AddonFiles {
 		throw "Source path not found: $SourcePath"
 	}
 
-	foreach ($dll in $RequiredDlls) {
-		$source = Join-Path $SourcePath $dll
-		$dest = Join-Path $DestPath $dll
+	# Copy each add-on to its specific subfolder
+	foreach ($addon in $AddOns) {
+		$targetFolder = Join-Path $EmpowerPath $addon.TargetSubfolder
 
-		if (-not (Test-Path $source)) {
-			Write-ColorText "✗ Missing: $dll" Red
-			throw "Required file not found: $source"
+		# Create target folder if it doesn't exist
+		if (-not (Test-Path $targetFolder)) {
+			New-Item -ItemType Directory -Path $targetFolder -Force | Out-Null
+			Write-ColorText "  Created folder: $($addon.TargetSubfolder)" Cyan
 		}
 
-		Copy-Item -Path $source -Destination $dest -Force
-		Write-ColorText "  ✓ Copied: $dll" Green
-	}
+		# Copy addon DLL
+		$addonSource = Join-Path $SourcePath $addon.DllName
+		$addonDest = Join-Path $targetFolder $addon.DllName
 
-	# Copy image files if they exist
-	$imageFiles = Get-ChildItem -Path $SourcePath -Filter "*.png" -ErrorAction SilentlyContinue
-	foreach ($img in $imageFiles) {
-		Copy-Item -Path $img.FullName -Destination $DestPath -Force
-		Write-ColorText "  ✓ Copied: $($img.Name)" Green
+		if (-not (Test-Path $addonSource)) {
+			Write-ColorText "  ✗ Missing: $($addon.DllName)" Red
+			throw "Required file not found: $addonSource"
+		}
+
+		Copy-Item -Path $addonSource -Destination $addonDest -Force
+		Write-ColorText "  ✓ Copied: $($addon.DllName) → $($addon.TargetSubfolder)" Green
+
+		# Copy shared DLLs to this addon's folder
+		foreach ($sharedDll in $SharedDlls) {
+			$sharedSource = Join-Path $SourcePath $sharedDll
+			$sharedDest = Join-Path $targetFolder $sharedDll
+
+			if (Test-Path $sharedSource) {
+				Copy-Item -Path $sharedSource -Destination $sharedDest -Force
+				Write-ColorText "  ✓ Copied: $sharedDll → $($addon.TargetSubfolder)" Green
+			} else {
+				Write-ColorText "  ⚠ Missing shared DLL: $sharedDll" Yellow
+			}
+		}
+
+		# Copy icon if exists
+		if ($addon.ImageName) {
+			$iconSource = Join-Path $SourcePath $addon.ImageName
+			$iconDest = Join-Path $targetFolder $addon.ImageName
+
+			if (Test-Path $iconSource) {
+				Copy-Item -Path $iconSource -Destination $iconDest -Force
+				Write-ColorText "  ✓ Copied: $($addon.ImageName) → $($addon.TargetSubfolder)" Green
+			}
+		}
+
+		Write-Host ""
 	}
 }
 
 function Register-Addon {
 	param(
-		[string]$TecnomatixBinPath,
+		[string]$EmpowerPath,
 		[hashtable]$Addon
 	)
 
-	# CommandReg.exe is in the parent eMPower folder, not in bin
-	$empowerPath = Split-Path -Parent $TecnomatixBinPath
-	$commandRegPath = Join-Path $empowerPath "commandreg.exe"
+	# commandreg.exe is in the eMPower folder
+	$commandRegPath = Join-Path $EmpowerPath "commandreg.exe"
 
 	if (-not (Test-Path $commandRegPath)) {
 		Write-ColorText "  ⚠ commandreg.exe not found at: $commandRegPath" Yellow
@@ -131,9 +164,10 @@ function Register-Addon {
 		return $false
 	}
 
-	$dllPath = Join-Path $TecnomatixBinPath $Addon.DllName
+	$dllPath = Join-Path $EmpowerPath "$($Addon.TargetSubfolder)\$($Addon.DllName)"
 
 	Write-ColorText "`nRegistering: $($Addon.Name)..." Yellow
+	Write-ColorText "  DLL: $dllPath" Gray
 	Write-ColorText "  Note: If registration doesn't complete automatically," Gray
 	Write-ColorText "        you may need to register manually via commandreg.exe GUI" Gray
 
@@ -147,7 +181,7 @@ function Register-Addon {
 	)
 
 	if ($Addon.ImageName) {
-		$imagePath = Join-Path $TecnomatixBinPath $Addon.ImageName
+		$imagePath = Join-Path $EmpowerPath "$($Addon.TargetSubfolder)\$($Addon.ImageName)"
 		if (Test-Path $imagePath) {
 			$arguments += "`"$imagePath`""
 		}
@@ -171,13 +205,12 @@ function Register-Addon {
 
 function Unregister-Addon {
 	param(
-		[string]$TecnomatixBinPath,
+		[string]$EmpowerPath,
 		[hashtable]$Addon
 	)
 
-	# CommandReg.exe is in the parent eMPower folder
-	$empowerPath = Split-Path -Parent $TecnomatixBinPath
-	$commandRegPath = Join-Path $empowerPath "commandreg.exe"
+	# commandreg.exe is in the eMPower folder
+	$commandRegPath = Join-Path $EmpowerPath "commandreg.exe"
 
 	if (-not (Test-Path $commandRegPath)) {
 		Write-ColorText "  ⚠ commandreg.exe not found, skipping unregistration" Yellow
@@ -205,15 +238,20 @@ function Unregister-Addon {
 }
 
 function Remove-AddonFiles {
-	param([string]$TecnomatixBinPath)
+	param([string]$EmpowerPath)
 
 	Write-ColorText "`nRemoving add-on files..." Yellow
 
-	foreach ($dll in $RequiredDlls) {
-		$filePath = Join-Path $TecnomatixBinPath $dll
-		if (Test-Path $filePath) {
-			Remove-Item -Path $filePath -Force
-			Write-ColorText "  ✓ Removed: $dll" Green
+	foreach ($addon in $AddOns) {
+		$targetFolder = Join-Path $EmpowerPath $addon.TargetSubfolder
+
+		if (Test-Path $targetFolder) {
+			# Remove all files from addon folder
+			Remove-Item -Path "$targetFolder\*" -Force -Recurse -ErrorAction SilentlyContinue
+			Write-ColorText "  ✓ Removed files from: $($addon.TargetSubfolder)" Green
+		}
+	}
+}
 		}
 	}
 
@@ -250,7 +288,8 @@ if (-not $TecnomatixPath) {
 	if (-not $TecnomatixPath) {
 		Write-ColorText "ERROR: Tecnomatix installation not found automatically." Red
 		Write-ColorText "Please run the installer with -TecnomatixPath parameter:" Yellow
-		Write-ColorText '  .\Install-ISRA-Addons.ps1 -TecnomatixPath "C:\Program Files\Tecnomatix\ProcessSimulate_XXXX\bin"' White
+		Write-ColorText '  .\Install-ISRA-Addons.ps1 -TecnomatixPath "C:\Program Files\Tecnomatix_XXXX\eMPower"' White
+		Write-ColorText '  (Replace XXXX with 2206.0, 2408.0, or 2502.0)' Gray
 		Read-Host "`nPress Enter to exit"
 		exit 1
 	}
@@ -262,7 +301,7 @@ if (-not $TecnomatixPath) {
 	}
 }
 
-Write-ColorText "Tecnomatix Path: $TecnomatixPath" Cyan
+Write-ColorText "eMPower Path: $TecnomatixPath" Cyan
 
 # Get current script directory (where DLLs should be)
 $ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -281,10 +320,10 @@ if ($UninstallOnly) {
 	Write-Header "Uninstalling ISRA Add-Ons"
 
 	foreach ($addon in $AddOns) {
-		Unregister-Addon -TecnomatixBinPath $TecnomatixPath -Addon $addon
+		Unregister-Addon -EmpowerPath $TecnomatixPath -Addon $addon
 	}
 
-	Remove-AddonFiles -TecnomatixBinPath $TecnomatixPath
+	Remove-AddonFiles -EmpowerPath $TecnomatixPath
 
 	Write-Header "Uninstallation Complete"
 	Write-ColorText "The ISRA add-ons have been removed from Process Simulate." Green
@@ -299,19 +338,19 @@ if ($UninstallOnly) {
 Write-Header "Installing ISRA Add-Ons"
 
 try {
-	# Copy files
-	Copy-AddonFiles -SourcePath $DllSourcePath -DestPath $TecnomatixPath
+	# Copy files to addon-specific subfolders
+	Copy-AddonFiles -SourcePath $DllSourcePath -EmpowerPath $TecnomatixPath
 
 	# Attempt to register add-ons (may require manual steps)
 	$registrationResults = @()
 	foreach ($addon in $AddOns) {
-		$result = Register-Addon -TecnomatixBinPath $TecnomatixPath -Addon $addon
+		$result = Register-Addon -EmpowerPath $TecnomatixPath -Addon $addon
 		$registrationResults += @{ Name = $addon.Name; Success = $result }
 	}
 
 	Write-Header "Installation Complete!"
 
-	Write-ColorText "✓ DLL files copied successfully" Green
+	Write-ColorText "✓ DLL files copied successfully to addon subfolders" Green
 	Write-Host ""
 
 	# Check if manual registration is needed
@@ -325,14 +364,15 @@ try {
 		Write-ColorText "Step 1: Ensure Process Simulate is CLOSED" White
 		Write-Host ""
 		Write-ColorText "Step 2: Navigate to eMPower folder:" White
-		$empowerPath = Split-Path -Parent $TecnomatixPath
-		Write-ColorText "  $empowerPath" Gray
+		Write-ColorText "  $TecnomatixPath" Gray
 		Write-Host ""
 		Write-ColorText "Step 3: Right-click commandreg.exe → Run as Administrator" White
 		Write-Host ""
 		Write-ColorText "Step 4: For each add-on:" White
 		foreach ($addon in $AddOns) {
-			Write-ColorText "  • Browse to: $TecnomatixPath\$($addon.DllName)" Gray
+			$addonPath = Join-Path $TecnomatixPath "$($addon.TargetSubfolder)\$($addon.DllName)"
+			Write-ColorText "  • $($addon.Name):" Cyan
+			Write-ColorText "    Browse to: $addonPath" Gray
 			Write-ColorText "    Click 'Create File' to generate .xml registration" Gray
 			Write-ColorText "    (For updates, select existing .xml from dropdown)" Gray
 			Write-ColorText "    Click 'Register'" Gray
@@ -352,7 +392,11 @@ try {
 		Write-Host ""
 	}
 
-	Write-ColorText "Installation location: $TecnomatixPath" Gray
+	Write-ColorText "Installation locations:" Gray
+	foreach ($addon in $AddOns) {
+		$addonPath = Join-Path $TecnomatixPath $addon.TargetSubfolder
+		Write-ColorText "  • $($addon.Name): $addonPath" DarkGray
+	}
 
 } catch {
 	Write-ColorText "`nERROR: Installation failed" Red
