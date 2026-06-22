@@ -19,6 +19,14 @@ namespace TempCompAddon.Presentation
     public class TempCompPresenter : IPresenter
     {
         private readonly ITempCompView _view;
+        private AnalysisReport _lastReport;
+        private List<NearestTcResult> _lastNearestResults;
+        private List<RobotPose> _lastBodyPoses;
+        private List<RobotPose> _lastTempCompPoses;
+        private PoseStatistics _lastBodyStats;
+        private PoseStatistics _lastTempCompStats;
+        private IRobotConfiguration _lastRobotConfig;
+        private double _lastThreshold;
 
         public TempCompPresenter(ITempCompView view)
         {
@@ -98,6 +106,16 @@ namespace TempCompAddon.Presentation
                 var bodyStats = analyzer.CalculateStatistics(bodyPoses);
                 var tcStats = analyzer.CalculateStatistics(tempCompPoses);
 
+                // Store results for export
+                _lastReport = report;
+                _lastNearestResults = nearestResults;
+                _lastBodyPoses = bodyPoses;
+                _lastTempCompPoses = tempCompPoses;
+                _lastBodyStats = bodyStats;
+                _lastTempCompStats = tcStats;
+                _lastRobotConfig = robotConfig;
+                _lastThreshold = input.MaxAngleThreshold;
+
                 // Display results through view
                 _view.DisplayValidationResults(report);
                 _view.DisplayNearestTcResults(nearestResults, input.MaxAngleThreshold, robotConfig);
@@ -107,6 +125,50 @@ namespace TempCompAddon.Presentation
             {
                 _view.ShowError($"Analysis failed: {ex.Message}", "Error");
             }
+        }
+
+        /// <summary>
+        /// Executes the export workflow.
+        /// </summary>
+        public void Export()
+        {
+            // Validate that analysis has been run
+            if (!_view.HasResults)
+            {
+                _view.ShowError("No results to export. Please run the analysis first.", "No Data");
+                return;
+            }
+
+            try
+            {
+                // Prepare export data
+                var exportData = PrepareExportData();
+
+                // Delegate to view to show export dialog
+                _view.ShowExportDialog(exportData);
+            }
+            catch (Exception ex)
+            {
+                _view.ShowError($"Export preparation failed: {ex.Message}", "Export Error");
+            }
+        }
+
+        /// <summary>
+        /// Prepares export data from the last analysis results.
+        /// </summary>
+        private TempCompExportData PrepareExportData()
+        {
+            return new TempCompExportData
+            {
+                ValidationReport = _lastReport,
+                NearestTcResults = _lastNearestResults,
+                BodyPoses = _lastBodyPoses,
+                TempCompPoses = _lastTempCompPoses,
+                RobotConfiguration = _lastRobotConfig,
+                MaxAngleThreshold = _lastThreshold,
+                BodyStatistics = _lastBodyStats,
+                TempCompStatistics = _lastTempCompStats
+            };
         }
 
         /// <summary>
@@ -144,6 +206,10 @@ namespace TempCompAddon.Presentation
         void DisplayValidationResults(AnalysisReport report);
         void DisplayNearestTcResults(List<NearestTcResult> results, double threshold, IRobotConfiguration config);
         void DisplayRawData(List<RobotPose> bodyPoses, List<RobotPose> tcPoses, IRobotConfiguration config, double threshold);
+
+        // Export support
+        bool HasResults { get; }
+        void ShowExportDialog(TempCompExportData data);
 
         // Error handling
         void ShowError(string message, string title);

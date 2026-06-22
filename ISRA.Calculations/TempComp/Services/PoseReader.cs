@@ -30,6 +30,8 @@ namespace ISRA.Calculations.TempComp.Services
             if (program == null)
                 return result;
 
+            string pathName = program.Name; // Capture the path name
+
             var locations = program.GetAllDescendants(
                 new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
 
@@ -56,6 +58,7 @@ namespace ISRA.Calculations.TempComp.Services
                     result.Add(new RobotPose
                     {
                         Name = loc.Name,
+                        PathName = pathName, // Set the parent path name
                         J1 = (double)joints[0] * (180.0 / Math.PI),
                         J2 = (double)joints[1] * (180.0 / Math.PI),
                         J3 = (double)joints[2] * (180.0 / Math.PI),

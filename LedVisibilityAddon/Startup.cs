@@ -476,6 +476,13 @@ namespace LedVisibilityAddon
             MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
         }
 
+        public bool HasResults => lstResults.Items.Count > 0;
+
+        public void ShowExportDialog(ExportData data)
+        {
+            ExcelExporter.Export(data.Rows, data.TrackerName, data.Triangle);
+        }
+
         private void AutoResizeColumns()
         {
             foreach (ColumnHeader col in lstResults.Columns)
@@ -499,73 +506,7 @@ namespace LedVisibilityAddon
         // ── Export ────────────────────────────────────────────────
         private void OnExport(object sender, EventArgs e)
         {
-            if (lstResults.Items.Count == 0)
-            {
-                MessageBox.Show("No results to export. Please run the analysis first.",
-                    "No Data", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                return;
-            }
-
-            var rows = new List<ExportRow>();
-            string trackerName = pickerTracker.Object != null
-                ? pickerTracker.Object.Name : "Unknown";
-
-            var pickers = new[] { pickerStar1, pickerStar2, pickerStar3 };
-            foreach (var picker in pickers)
-            {
-                var starObj = picker.Object;
-                if (starObj == null) continue;
-
-                var starLoc = starObj as ITxLocatableObject;
-                if (starLoc == null) continue;
-
-                var trackerLoc = pickerTracker.Object as ITxLocatableObject;
-                if (trackerLoc == null) continue;
-
-                TxTransformation trackerWorld = trackerLoc.AbsoluteLocation;
-                TxVector ledWorldPos = star_515_0139.GetLedWorldPosition(starLoc);
-                TxVector localPt = _trackerFov.ToLocalCoordinates(
-                    ledWorldPos, trackerWorld);
-
-                var zone = _trackerFov.GetPositionZone(localPt);
-                var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
-                    starLoc, trackerWorld, (double)nudMaxAngle.Value);
-
-                bool ok = zone != PositionZone.NOK &&
-                          emitterResult.IsValid;
-
-                rows.Add(new ExportRow
-                {
-                    StarName = starObj.Name,
-                    LocalX = localPt.X,
-                    LocalY = localPt.Y,
-                    LocalZ = localPt.Z,
-                    Zone = _trackerFov.GetZoneName(localPt),
-                    InsideFov = ok,
-                    TrackerName = trackerName
-                });
-            }
-
-            GeometryCalculations.TriangleResult triResult = null;
-            var trackerLoc2 = pickerTracker.Object as ITxLocatableObject;
-            if (trackerLoc2 != null && rows.Count == 3 &&
-                rows.TrueForAll(r => r.InsideFov))
-            {
-                TxTransformation tw = trackerLoc2.AbsoluteLocation;
-                var pts = new TxVector[3];
-                for (int i = 0; i < 3; i++)
-                {
-                    var sl = pickers[i].Object as ITxLocatableObject;
-                    if (sl != null)
-                        pts[i] = _trackerFov.ToLocalCoordinates(
-                            star_515_0139.GetLedWorldPosition(sl), tw);
-                }
-                if (pts[0] != null && pts[1] != null && pts[2] != null)
-                    triResult = GeometryCalculations.CalculateTriangleHeight(
-                        pts[0], pts[1], pts[2]);
-            }
-
-            ExcelExporter.Export(rows, trackerName, triResult);
+            _presenter.Export();
         }
 
         // ── Color helpers ─────────────────────────────────────────

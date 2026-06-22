@@ -54,6 +54,7 @@ namespace TempCompAddon
         private Button btnHelp;
         private NumericUpDown nudStepSize;
         private Button btnAnalyze;
+        private Button btnExport;
         private RadioButton rbFanuc;
         private RadioButton rbKuka;
         private RadioButton rbAbb;
@@ -423,6 +424,7 @@ namespace TempCompAddon
                 Font = new Font("Consolas", 8)
             };
             lstRawData.Columns.Add("Body Point", 110);
+            lstRawData.Columns.Add("Body Path", 120);
             lstRawData.Columns.Add("J1", 50);
             lstRawData.Columns.Add("J2", 50);
             lstRawData.Columns.Add("J3", 50);
@@ -431,6 +433,7 @@ namespace TempCompAddon
             lstRawData.Columns.Add("J6", 50);
             lstRawData.Columns.Add("J2-3", 60);
             lstRawData.Columns.Add("TC Point", 110);
+            lstRawData.Columns.Add("TC Path", 120);
             lstRawData.Columns.Add("TC J1", 50);
             lstRawData.Columns.Add("TC J2", 50);
             lstRawData.Columns.Add("TC J3", 50);
@@ -445,12 +448,34 @@ namespace TempCompAddon
             tabControl.TabPages.Add(tabRaw);
             this.Controls.Add(tabControl);
 
+            // Calculate button positions from bottom
+            int buttonY = this.ClientSize.Height - 76; // 76px from bottom for Export + Help + spacing
+
+            // ── Export button ─────────────────────────────────────
+            btnExport = new Button
+            {
+                Text = "Export to Excel",
+                Left = lx,
+                Top = buttonY,
+                Width = 765,
+                Height = 32,
+                BackColor = Color.FromArgb(0, 120, 0),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+            };
+            btnExport.Click += OnExport;
+            this.Controls.Add(btnExport);
+            btnExport.BringToFront();
+            buttonY += 38; // 32 height + 6 spacing
+
             // ── Help button ───────────────────────────────────────
             btnHelp = new Button
             {
                 Text = "Help / About",
                 Left = lx,
-                Top = this.ClientSize.Height - 38,
+                Top = buttonY,
                 Width = 765,
                 Height = 28,
                 BackColor = Color.FromArgb(60, 60, 60),
@@ -461,6 +486,7 @@ namespace TempCompAddon
             };
             btnHelp.Click += (s, e) => HelpAbout.ShowAbout();
             this.Controls.Add(btnHelp);
+            btnHelp.BringToFront();
         }
 
         // ── Pick from PS ──────────────────────────────────────────
@@ -558,6 +584,12 @@ namespace TempCompAddon
             _presenter.Analyze();
         }
 
+        // ── Export ────────────────────────────────────────────────
+        private void OnExport(object sender, EventArgs e)
+        {
+            _presenter.Export();
+        }
+
         // ── ITempCompView Implementation ──────────────────────────
         public List<TxWeldOperation> BodyPrograms => _bodyPrograms;
         public List<TxWeldOperation> TempCompPrograms => _tempCompPrograms;
@@ -591,6 +623,15 @@ namespace TempCompAddon
         public void ShowError(string message, string title)
         {
             MessageBox.Show(message, title, MessageBoxButtons.OK, MessageBoxIcon.Warning);
+        }
+
+        public bool HasResults => lstValidation.Items.Count > 0 ||
+                                   lstNearestTc.Items.Count > 0 ||
+                                   lstRawData.Items.Count > 0;
+
+        public void ShowExportDialog(TempCompExportData data)
+        {
+            TempCompAddon.Services.TempCompExcelExporter.Export(data);
         }
 
         // ── Helpers ───────────────────────────────────────────────

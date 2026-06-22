@@ -157,6 +157,9 @@ namespace TempCompAddon.Presentation
                 var item = new ListViewItem(body != null ? body.Name : "");
                 item.UseItemStyleForSubItems = false;
 
+                // Body Path column
+                item.SubItems.Add(body != null ? body.PathName ?? "" : "");
+
                 // Body columns
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
@@ -179,6 +182,9 @@ namespace TempCompAddon.Presentation
 
                 // TC columns
                 item.SubItems.Add(tc != null ? tc.Name : "");
+
+                // TC Path column
+                item.SubItems.Add(tc != null ? tc.PathName ?? "" : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");

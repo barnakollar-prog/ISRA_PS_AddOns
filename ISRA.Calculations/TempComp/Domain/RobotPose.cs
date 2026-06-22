@@ -10,6 +10,11 @@ namespace ISRA.Calculations.TempComp.Domain
         /// </summary>
         public string Name { get; set; }
 
+        /// <summary>
+        /// Name of the parent path/program (WeldOperation) this pose belongs to.
+        /// </summary>
+        public string PathName { get; set; }
+
         /// <summary>Joint 1 angle in degrees</summary>
         public double J1 { get; set; }
 

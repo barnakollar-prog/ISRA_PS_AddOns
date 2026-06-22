@@ -145,6 +145,88 @@ namespace LedVisibilityAddon.Presentation
 
             _view.RefreshDisplay();
         }
+
+        /// <summary>
+        /// Export the visibility analysis results to Excel.
+        /// </summary>
+        public void Export()
+        {
+            // Validate there are results to export
+            if (!_view.HasResults)
+            {
+                _view.ShowError("No results to export. Please run the analysis first.", "No Data");
+                return;
+            }
+
+            // Prepare export data
+            var data = PrepareExportData();
+
+            // Delegate to view for file dialog and export
+            _view.ShowExportDialog(data);
+        }
+
+        /// <summary>
+        /// Prepare export data by analyzing stars and triangle.
+        /// </summary>
+        private ExportData PrepareExportData()
+        {
+            var data = new ExportData
+            {
+                TrackerName = _view.SelectedTracker?.Name ?? "Unknown"
+            };
+
+            var trackerLoc = _view.SelectedTracker as ITxLocatableObject;
+            if (trackerLoc == null)
+                return data;
+
+            TxTransformation trackerWorld = trackerLoc.AbsoluteLocation;
+            double maxAngle = _view.MaxAngle;
+
+            var selectedStars = _view.SelectedStars;
+            var localPositions = new List<TxVector>();
+            bool allOK = true;
+
+            // Collect star data
+            foreach (var starObj in selectedStars)
+            {
+                var starLoc = starObj as ITxLocatableObject;
+                if (starLoc == null) continue;
+
+                // Get LED position in tracker local coordinates
+                TxVector ledWorldPos = _starGeometry.GetLedWorldPosition(starLoc);
+                TxVector localPt = _trackerFov.ToLocalCoordinates(ledWorldPos, trackerWorld);
+                localPositions.Add(localPt);
+
+                // Determine zone and emitter visibility
+                var zone = _trackerFov.GetPositionZone(localPt);
+                var emitterResult = GeometryCalculations.CheckStarEmitterVisibility(
+                    starLoc, trackerWorld, maxAngle);
+
+                bool starOK = zone != PositionZone.NOK && emitterResult.IsValid;
+                if (!starOK) allOK = false;
+
+                // Create export row
+                data.Rows.Add(new ExportRow
+                {
+                    StarName = starObj.Name,
+                    LocalX = localPt.X,
+                    LocalY = localPt.Y,
+                    LocalZ = localPt.Z,
+                    Zone = _trackerFov.GetZoneName(localPt),
+                    InsideFov = starOK,
+                    TrackerName = data.TrackerName
+                });
+            }
+
+            // Calculate triangle if applicable
+            if (selectedStars.Count == 3 && allOK && localPositions.Count == 3)
+            {
+                data.Triangle = GeometryCalculations.CalculateTriangleHeight(
+                    localPositions[0], localPositions[1], localPositions[2]);
+            }
+
+            return data;
+        }
     }
 
     /// <summary>
@@ -211,6 +293,16 @@ namespace LedVisibilityAddon.Presentation
         /// Show an error message to the user.
         /// </summary>
         void ShowError(string message, string title);
+
+        /// <summary>
+        /// Check if there are analysis results available.
+        /// </summary>
+        bool HasResults { get; }
+
+        /// <summary>
+        /// Show export dialog and perform export.
+        /// </summary>
+        void ShowExportDialog(ExportData data);
     }
 
     /// <summary>
@@ -225,8 +317,8 @@ namespace LedVisibilityAddon.Presentation
         public PositionZone Zone { get; set; }
         public string ZoneLabel { get; set; }
         public string ZoneName { get; set; }
-        public StarEmitterVisibilityResult EmitterResult { get; set; }
-        public StarLineOfSightResult LineOfSightResult { get; set; }
+        public GeometryCalculations.StarEmitterVisibilityResult EmitterResult { get; set; }
+        public CollisionCheck.StarLineOfSightResult LineOfSightResult { get; set; }
         public bool IsValid { get; set; }
         public double MaxAngle { get; set; }
     }
