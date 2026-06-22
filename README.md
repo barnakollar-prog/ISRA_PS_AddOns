@@ -5,13 +5,16 @@ Process Simulate Add-Ons developed by ISRA Vision / CAD & Simulation Team.
 ## 🎯 Quick Start
 
 ### For End Users (No Visual Studio Required)
-📥 **[Download Latest Release](https://github.com/barnakollar-prog/ISRA_PS_AddOns/releases/latest)** 
 
-1. Download `ISRA_AddOns_Installer_v1.0.zip`
+**Note:** This is a private repository. Contact your administrator for the installer package.
+
+📥 **Installation:**
+1. Get `ISRA_AddOns_Installer_v1.0.zip` from your network share or administrator
 2. Extract the ZIP file
 3. Run `INSTALL.bat` as Administrator
 4. Follow the registration steps in `INSTALLATION_GUIDE.md`
 
+👉 See [Distribution Instructions](DISTRIBUTION_INSTRUCTIONS.md) for sharing options.  
 👉 See [Deployment Guide](docs/DEPLOYMENT_GUIDE.md) for detailed installation instructions.
 
 ### For Developers
