@@ -379,16 +379,24 @@ try {
 			Write-Host ""
 		}
 		Write-ColorText "Step 5: Open Process Simulate" White
-		Write-ColorText "Step 6: Add buttons to toolbar (Tools → Customize...)" White
+		Write-ColorText "Step 6: Customize Ribbon - Add to ISRA Vision tab:" White
+		Write-ColorText "    • Customize Quick Access Toolbar (arrow, top left) → More Commands" Gray
+		Write-ColorText "    • Customize Ribbon → New Tab → 'ISRA Vision'" Gray
+		Write-ColorText "    • New Group → 'Accusite_Tools' and 'TempComp'" Gray
+		Write-ColorText "    • All Commands → Add 'Star Visibility Analyzer' and 'Temp Comp Validator'" Gray
 		Write-Host ""
 	} else {
 		Write-ColorText "✓ Add-ons registered successfully" Green
 		Write-Host ""
-		Write-ColorText "Next steps:" Cyan
+		Write-ColorText "Next steps - Add to Process Simulate Ribbon:" Cyan
 		Write-ColorText "1. Open Siemens Process Simulate" White
-		Write-ColorText "2. Go to: Tools → Customize..." White
-		Write-ColorText "3. Find 'ISRA Temp Comp Validator' and 'ISRA LED Visibility Analyzer'" White
-		Write-ColorText "4. Drag them to your toolbar" White
+		Write-ColorText "2. Customize Quick Access Toolbar (arrow, top left) → More Commands..." White
+		Write-ColorText "3. Customize Ribbon tab" White
+		Write-ColorText "4. Create New Tab: 'ISRA Vision'" White
+		Write-ColorText "5. Create New Groups: 'Accusite_Tools' and 'TempComp'" White
+		Write-ColorText "6. From All Commands, add:" White
+		Write-ColorText "   • 'Star Visibility Analyzer' → Accusite_Tools" Gray
+		Write-ColorText "   • 'Temp Comp Validator' → TempComp" Gray
 		Write-Host ""
 	}
 

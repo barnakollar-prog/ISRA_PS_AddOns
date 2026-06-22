@@ -60,13 +60,41 @@ This installer package includes:
 
 1. **Open Process Simulate**
 
-2. **Go to**: `Tools → Customize...`
+2. **Click** the **"Customize Quick Access Toolbar"** arrow (top left corner)
 
-3. **Find** "ISRA Temp Comp Validator" and "ISRA LED Visibility Analyzer"
+3. **Click** "More Commands..."
 
-4. **Drag** them to your toolbar
+4. **Click** "Customize Ribbon" tab
 
-5. **Click** "Close"
+5. **Create ISRA Vision tab:**
+   - In "Customize the Ribbon" section (right side)
+   - Click **"New Tab"**
+   - Rename it to: **"ISRA Vision"**
+
+6. **Create Accusite_Tools group:**
+   - Click on the new "ISRA Vision" tab
+   - Click **"New Group"**
+   - Rename it to: **"Accusite_Tools"**
+
+7. **Add Star Visibility Analyzer:**
+   - In "Choose commands from" (left side), select **"All Commands"**
+   - Search and click on **"Star Visibility Analyzer"**
+   - Select the "Accusite_Tools" group (right side)
+   - Click **"Add >>"** button
+
+8. **Create TempComp group:**
+   - Click on "ISRA Vision" tab
+   - Click **"New Group"**
+   - Rename it to: **"TempComp"**
+
+9. **Add Temp Comp Validator:**
+   - In "All Commands" (left side), search and click on **"Temp Comp Validator"** (or **"ISRA Temp Comp Validator"**)
+   - Select the "TempComp" group (right side)
+   - Click **"Add >>"** button
+
+10. **Click OK** to apply changes
+
+Now you'll see the **ISRA Vision** tab in your ribbon with both add-ons organized in groups!
 
 ### Alternative: Manual Installation (If Automatic Fails)
 

@@ -73,15 +73,29 @@ Two powerful add-ons for Process Simulate:
    - Click **"Create File"** (generates .xml registration)
    - Click **"Register"**
 
-### Step 5: Add to Toolbar
+### Step 5: Add to Ribbon
 
 1. Open **Process Simulate**
-2. Go to: **Tools → Customize...**
-3. In the Commands tab, find:
-   - **ISRA Temp Comp Validator**
-   - **ISRA LED Visibility Analyzer**
-4. **Drag** them to your toolbar
-5. Click **Close**
+
+2. Click the **"Customize Quick Access Toolbar"** arrow (top left corner)
+
+3. Click **"More Commands..."**
+
+4. Click **"Customize Ribbon"** tab
+
+5. **Create custom tab and groups:**
+   - Click **"New Tab"** → Rename to **"ISRA Vision"**
+   - Under "ISRA Vision", click **"New Group"** → Rename to **"Accusite_Tools"**
+   - Click **"New Group"** again → Rename to **"TempComp"**
+
+6. **Add commands:**
+   - In "Choose commands from", select **"All Commands"**
+   - Find **"Star Visibility Analyzer"** → Select "Accusite_Tools" → Click **"Add >>"**
+   - Find **"Temp Comp Validator"** → Select "TempComp" → Click **"Add >>"**
+
+7. Click **OK**
+
+Your add-ons now appear in the **ISRA Vision** tab!
 
 ---
 
