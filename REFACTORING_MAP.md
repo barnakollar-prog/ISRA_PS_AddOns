@@ -656,6 +656,69 @@ LedVisibilityReportFormatter.cs: 280 lines
 
 ---
 
+## 📤 Excel Export Features (Phase 5)
+
+### TempComp Excel Export
+
+**New Service:** `TempCompAddon/Services/TempCompExcelExporter.cs`
+
+**Features:**
+- **3 Excel Worksheets:**
+  1. **Validation Results**: Pass/fail summary for all 6 validators with color coding
+  2. **Nearest TC**: Body-to-TC comparison (J2-3, J4, J5, J6, Max Diff) with threshold highlighting
+  3. **Raw Data**: Complete pose data with J1-J6 values and path names
+
+**Architecture:**
+```
+TempCompPresenter.cs
+├── Export() - Validates results exist
+└── PrepareExportData() - Builds TempCompExportData DTO
+    └── TempCompExportData.cs (DTO)
+        ├── ValidationReport
+        ├── NearestTcResults
+        ├── BodyPoses (with PathName)
+        ├── TempCompPoses (with PathName)
+        ├── RobotConfiguration
+        ├── MaxAngleThreshold
+        └── Statistics
+            └── TempCompExcelExporter.Export(data)
+                ├── CreateValidationSheet()
+                ├── CreateNearestTcSheet()
+                └── CreateRawDataSheet()
+```
+
+**MVP Pattern:**
+- Presenter owns export orchestration
+- Form delegates via `ShowExportDialog(TempCompExportData)`
+- Export button positioned above Help/About (matches LedVisibility)
+
+### LedVisibility Export Refactor
+
+**Refactored to MVP:**
+- Moved export logic from `OnExport()` in Startup.cs to `LedVisibilityPresenter.Export()`
+- Created `ExportData.cs` DTO
+- Updated `ILedVisibilityView` with `HasResults` and `ShowExportDialog(ExportData)`
+- Maintains existing Excel format (single sheet with star visibility + optional triangle)
+
+### Path Name Tracking
+
+**Domain Enhancement:** `ISRA.Calculations/TempComp/Domain/RobotPose.cs`
+- Added `PathName` property to track parent WeldOperation
+
+**Service Update:** `ISRA.Calculations/TempComp/Services/PoseReader.cs`
+- `ReadPosesFromProgram()` now captures and populates `PathName`
+
+**UI Enhancement:**
+- Raw Data tab displays **"Body Path"** and **"TC Path"** columns
+- Excel Raw Data sheet includes **"Path"** column for traceability
+
+**Benefits:**
+- Easy identification of which WeldOperation each pose belongs to
+- Improved debugging and issue tracing
+- Matches Process Simulate hierarchical structure
+
+---
+
 ## 🗺️ Quick Reference: "Where Did X Go?"
 
 | I'm looking for... | It moved to... |
@@ -665,13 +728,17 @@ LedVisibilityReportFormatter.cs: 280 lines
 | TempComp ListView formatting | `TempCompReportFormatter.cs` |
 | Robot-specific angle calculations | `IRobotConfiguration` strategy classes |
 | TempComp distance calculations | `DistanceCalculator.cs` service |
+| **TempComp export logic** | **`TempCompExcelExporter.cs` service** |
+| **TempComp export data preparation** | **`TempCompPresenter.PrepareExportData()`** |
 | LedVisibility OnAnalyze workflow | `LedVisibilityPresenter.cs` |
+| **LedVisibility export logic** | **`LedVisibilityPresenter.Export()`** |
 | LedVisibility collapsible row logic | `LedVisibilityReportFormatter.cs` |
 | Star component methods | `IStar` interface + `Star515_0139` class |
 | Tracker component methods | `ITracker` interface + `Tracker920_0005` class |
 | Color coding logic | `ColorPalette.cs` in ISRA.Core |
 | Validation base classes | `IValidator<T>` in ISRA.Core |
+| **Path/WeldOperation tracking** | **`RobotPose.PathName` property** |
 
 ---
 
-**This map shows the complete transformation from legacy procedural code to modern OOP architecture!** 🚀
+**This map shows the complete transformation from legacy procedural code to modern OOP architecture with comprehensive export capabilities!** 🚀
