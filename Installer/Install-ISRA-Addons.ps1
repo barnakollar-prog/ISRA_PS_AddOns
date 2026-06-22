@@ -121,16 +121,24 @@ function Register-Addon {
 		[hashtable]$Addon
 	)
 
-	$commandRegPath = Join-Path $TecnomatixBinPath "CommandReg.exe"
+	# CommandReg.exe is in the parent eMPower folder, not in bin
+	$empowerPath = Split-Path -Parent $TecnomatixBinPath
+	$commandRegPath = Join-Path $empowerPath "commandreg.exe"
 
 	if (-not (Test-Path $commandRegPath)) {
-		throw "CommandReg.exe not found at: $commandRegPath"
+		Write-ColorText "  ⚠ commandreg.exe not found at: $commandRegPath" Yellow
+		Write-ColorText "  ℹ Manual registration required - see post-install instructions" Cyan
+		return $false
 	}
 
 	$dllPath = Join-Path $TecnomatixBinPath $Addon.DllName
 
 	Write-ColorText "`nRegistering: $($Addon.Name)..." Yellow
+	Write-ColorText "  Note: If registration doesn't complete automatically," Gray
+	Write-ColorText "        you may need to register manually via commandreg.exe GUI" Gray
 
+	# Note: commandreg.exe is typically a GUI tool, not a command-line tool
+	# Attempting automated registration, but may require manual steps
 	$arguments = @(
 		"/register",
 		"`"$dllPath`"",
@@ -145,12 +153,19 @@ function Register-Addon {
 		}
 	}
 
-	$process = Start-Process -FilePath $commandRegPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+	try {
+		$process = Start-Process -FilePath $commandRegPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -ErrorAction SilentlyContinue
 
-	if ($process.ExitCode -eq 0) {
-		Write-ColorText "  ✓ Registered successfully" Green
-	} else {
-		Write-ColorText "  ⚠ Registration completed with code: $($process.ExitCode)" Yellow
+		if ($process.ExitCode -eq 0) {
+			Write-ColorText "  ✓ Registered successfully" Green
+			return $true
+		} else {
+			Write-ColorText "  ⚠ Registration may require manual steps (exit code: $($process.ExitCode))" Yellow
+			return $false
+		}
+	} catch {
+		Write-ColorText "  ⚠ Automated registration not available" Yellow
+		return $false
 	}
 }
 
@@ -160,10 +175,12 @@ function Unregister-Addon {
 		[hashtable]$Addon
 	)
 
-	$commandRegPath = Join-Path $TecnomatixBinPath "CommandReg.exe"
+	# CommandReg.exe is in the parent eMPower folder
+	$empowerPath = Split-Path -Parent $TecnomatixBinPath
+	$commandRegPath = Join-Path $empowerPath "commandreg.exe"
 
 	if (-not (Test-Path $commandRegPath)) {
-		Write-ColorText "  ⚠ CommandReg.exe not found, skipping unregistration" Yellow
+		Write-ColorText "  ⚠ commandreg.exe not found, skipping unregistration" Yellow
 		return
 	}
 
@@ -174,12 +191,16 @@ function Unregister-Addon {
 		$Addon.CommandName
 	)
 
-	$process = Start-Process -FilePath $commandRegPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow
+	try {
+		$process = Start-Process -FilePath $commandRegPath -ArgumentList $arguments -Wait -PassThru -NoNewWindow -ErrorAction SilentlyContinue
 
-	if ($process.ExitCode -eq 0) {
-		Write-ColorText "  ✓ Unregistered successfully" Green
-	} else {
-		Write-ColorText "  ⚠ Unregistration completed with code: $($process.ExitCode)" Yellow
+		if ($process.ExitCode -eq 0) {
+			Write-ColorText "  ✓ Unregistered successfully" Green
+		} else {
+			Write-ColorText "  ⚠ Unregistration completed with code: $($process.ExitCode)" Yellow
+		}
+	} catch {
+		Write-ColorText "  ⚠ Manual unregistration may be required" Yellow
 	}
 }
 
@@ -281,21 +302,56 @@ try {
 	# Copy files
 	Copy-AddonFiles -SourcePath $DllSourcePath -DestPath $TecnomatixPath
 
-	# Register add-ons
+	# Attempt to register add-ons (may require manual steps)
+	$registrationResults = @()
 	foreach ($addon in $AddOns) {
-		Register-Addon -TecnomatixBinPath $TecnomatixPath -Addon $addon
+		$result = Register-Addon -TecnomatixBinPath $TecnomatixPath -Addon $addon
+		$registrationResults += @{ Name = $addon.Name; Success = $result }
 	}
 
 	Write-Header "Installation Complete!"
 
-	Write-ColorText "✓ All add-ons installed successfully" Green
+	Write-ColorText "✓ DLL files copied successfully" Green
 	Write-Host ""
-	Write-ColorText "Next steps:" Cyan
-	Write-ColorText "1. Open Siemens Process Simulate" White
-	Write-ColorText "2. Go to: Tools → Customize..." White
-	Write-ColorText "3. Find 'ISRA Temp Comp Validator' and 'ISRA LED Visibility Analyzer'" White
-	Write-ColorText "4. Drag them to your toolbar" White
-	Write-Host ""
+
+	# Check if manual registration is needed
+	$manualRegNeeded = $registrationResults | Where-Object { -not $_.Success }
+
+	if ($manualRegNeeded) {
+		Write-ColorText "⚠ Manual Registration Required" Yellow
+		Write-Host ""
+		Write-ColorText "The DLL files are installed, but you need to register the add-ons manually:" Cyan
+		Write-Host ""
+		Write-ColorText "Step 1: Ensure Process Simulate is CLOSED" White
+		Write-Host ""
+		Write-ColorText "Step 2: Navigate to eMPower folder:" White
+		$empowerPath = Split-Path -Parent $TecnomatixPath
+		Write-ColorText "  $empowerPath" Gray
+		Write-Host ""
+		Write-ColorText "Step 3: Right-click commandreg.exe → Run as Administrator" White
+		Write-Host ""
+		Write-ColorText "Step 4: For each add-on:" White
+		foreach ($addon in $AddOns) {
+			Write-ColorText "  • Browse to: $TecnomatixPath\$($addon.DllName)" Gray
+			Write-ColorText "    Click 'Create File' to generate .xml registration" Gray
+			Write-ColorText "    (For updates, select existing .xml from dropdown)" Gray
+			Write-ColorText "    Click 'Register'" Gray
+			Write-Host ""
+		}
+		Write-ColorText "Step 5: Open Process Simulate" White
+		Write-ColorText "Step 6: Add buttons to toolbar (Tools → Customize...)" White
+		Write-Host ""
+	} else {
+		Write-ColorText "✓ Add-ons registered successfully" Green
+		Write-Host ""
+		Write-ColorText "Next steps:" Cyan
+		Write-ColorText "1. Open Siemens Process Simulate" White
+		Write-ColorText "2. Go to: Tools → Customize..." White
+		Write-ColorText "3. Find 'ISRA Temp Comp Validator' and 'ISRA LED Visibility Analyzer'" White
+		Write-ColorText "4. Drag them to your toolbar" White
+		Write-Host ""
+	}
+
 	Write-ColorText "Installation location: $TecnomatixPath" Gray
 
 } catch {

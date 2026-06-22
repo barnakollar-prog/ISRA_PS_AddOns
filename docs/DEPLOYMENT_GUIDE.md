@@ -42,18 +42,38 @@ Two powerful add-ons for Process Simulate:
 2. Select **"Extract All..."**
 3. Extract to a folder (e.g., `C:\Temp\ISRA_Installer\`)
 
-### Step 3: Install
+### Step 3: Run Installer
 
 1. Open the extracted folder
 2. **Right-click** `INSTALL.bat`
 3. Select **"Run as Administrator"**
-4. Follow the on-screen instructions
-5. The installer will:
+4. The installer will:
    - Detect your Process Simulate installation automatically
    - Copy all required DLL files
-   - Register the add-ons
 
-### Step 4: Add to Toolbar
+### Step 4: Register Add-Ons
+
+⚠️ **Important**: Close Process Simulate before this step!
+
+1. Open **File Explorer** and go to your eMPower folder:
+   ```
+   C:\Program Files\Tecnomatix_XXXX\eMPower\
+   ```
+   (XXXX = 2206.0, 2408.0, or 2502.0)
+
+2. **Right-click** `commandreg.exe` → **"Run as Administrator"**
+
+3. **Register TempComp Validator:**
+   - Browse to: `bin\TempCompAddon.dll`
+   - Click **"Create File"** (generates .xml registration)
+   - Click **"Register"**
+
+4. **Register LED Visibility Analyzer:**
+   - Browse to: `bin\LedVisibilityAddon.dll`
+   - Click **"Create File"** (generates .xml registration)
+   - Click **"Register"**
+
+### Step 5: Add to Toolbar
 
 1. Open **Process Simulate**
 2. Go to: **Tools → Customize...**

@@ -14,7 +14,7 @@ This installer package includes:
 
 ## 📥 Installation Steps
 
-### Automatic Installation (Recommended)
+### Step 1: Run the Installer
 
 1. **Extract** the installer package to a folder (e.g., `C:\Temp\ISRA_Addons`)
 
@@ -22,17 +22,53 @@ This installer package includes:
 
 3. The installer will:
    - Automatically detect your Process Simulate installation
-   - Copy all required DLL files
-   - Register both add-ons with Process Simulate
+   - Copy all required DLL files to the bin folder
 
-4. **Open Process Simulate** after installation
+### Step 2: Register Add-Ons (Manual Step Required)
 
-5. **Add toolbar buttons:**
-   - Go to: `Tools → Customize...`
-   - Find "ISRA Temp Comp Validator" and "ISRA LED Visibility Analyzer"
-   - Drag them to your toolbar
+⚠️ **Important**: Process Simulate must be CLOSED during this step.
 
-### Manual Installation (If Automatic Fails)
+1. **Open File Explorer** and navigate to your eMPower folder:
+   ```
+   C:\Program Files\Tecnomatix_XXXX\eMPower\
+   ```
+   (Replace `XXXX` with your version: 2206.0, 2408.0, or 2502.0)
+
+2. **Right-click** `commandreg.exe` → **"Run as Administrator"**
+
+3. **For TempComp Validator:**
+   - Click **"Browse"** and navigate to:
+     ```
+     C:\Program Files\Tecnomatix_XXXX\eMPower\bin\TempCompAddon.dll
+     ```
+   - Click **"Create File"** to generate the .xml registration file
+     - (If updating an existing installation, select the existing .xml from the dropdown instead)
+   - Click **"Register"**
+
+4. **For LED Visibility Analyzer:**
+   - Click **"Browse"** and navigate to:
+     ```
+     C:\Program Files\Tecnomatix_XXXX\eMPower\bin\LedVisibilityAddon.dll
+     ```
+   - Click **"Create File"** to generate the .xml registration file
+     - (If updating an existing installation, select the existing .xml from the dropdown instead)
+   - Click **"Register"**
+
+5. **Close** commandreg.exe
+
+### Step 3: Add to Toolbar
+
+1. **Open Process Simulate**
+
+2. **Go to**: `Tools → Customize...`
+
+3. **Find** "ISRA Temp Comp Validator" and "ISRA LED Visibility Analyzer"
+
+4. **Drag** them to your toolbar
+
+5. **Click** "Close"
+
+### Alternative: Manual Installation (If Automatic Fails)
 
 If the automatic installer cannot find your Tecnomatix installation:
 
@@ -45,9 +81,11 @@ If the automatic installer cannot find your Tecnomatix installation:
 
 3. Run with custom path:
    ```powershell
-   .\Install-ISRA-Addons.ps1 -TecnomatixPath "C:\Program Files\Tecnomatix\ProcessSimulate_XXXX\bin"
+   .\Install-ISRA-Addons.ps1 -TecnomatixPath "C:\Program Files\Tecnomatix_XXXX\eMPower\bin"
    ```
-   (Replace `XXXX` with your version: 2206, 2408, or 2502)
+   (Replace `XXXX` with your version: 2206.0, 2408.0, or 2502.0)
+
+4. Then follow **Step 2** and **Step 3** above for registration
 
 ## 🧪 Verify Installation
 
