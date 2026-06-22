@@ -28,8 +28,10 @@ namespace LedVisibilityAddon.Presentation
         {
             if (results == null || listView == null) return;
 
-            var emitters = Star515_0139.GetEmitters();
-            var cameras = Tracker920_0005.GetCameras();
+            var star = new Star515_0139();
+            var tracker = new Tracker920_0005();
+            var emitters = star.GetEmitters();
+            var cameras = tracker.GetCameras();
 
             foreach (var result in results)
             {

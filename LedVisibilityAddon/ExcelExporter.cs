@@ -8,20 +8,10 @@ using OfficeOpenXml.Style;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Components.AccuSite.Stars;
 using ISRA.Calculations.AccuSite;
+using LedVisibilityAddon.Presentation;
 
 namespace LedVisibilityAddon
 {
-    public class ExportRow
-    {
-        public string StarName { get; set; }
-        public double LocalX { get; set; }
-        public double LocalY { get; set; }
-        public double LocalZ { get; set; }
-        public string Zone { get; set; }
-        public bool InsideFov { get; set; }
-        public string TrackerName { get; set; }
-    }
-
     public static class ExcelExporter
     {
         public static void Export(

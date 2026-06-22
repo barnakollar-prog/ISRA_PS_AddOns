@@ -25,7 +25,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>bin\Release\</OutputPath>
+    <OutputPath>..\..\..\..\..\..\Program Files\Tecnomatix_2206.0\eMPower\DotNetCommands\Accusite\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -106,6 +106,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ExcelExporter.cs" />
+    <Compile Include="Presentation\ExportData.cs" />
     <Compile Include="Presentation\LedVisibilityPresenter.cs" />
     <Compile Include="Presentation\LedVisibilityReportFormatter.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
