@@ -29,7 +29,7 @@ Two powerful add-ons for Process Simulate:
 ### Step 1: Get the Installer
 
 **Option A: Download from GitHub Releases** (Recommended)
-1. Go to: https://github.com/barnakollar-prog/ISRA_PS_AddOns/releases
+1. Go to: https://github.com/barnakollar-prog/ISRA_PS_AddOns/releases/latest
 2. Download `ISRA_AddOns_Installer_v1.0.zip`
 
 **Option B: Get from Network Share**
