@@ -5,9 +5,6 @@ using ISRA.Calculations.TempComp.Domain;
 
 namespace ISRA.Calculations.TempComp.Services
 {
-    /// <summary>
-    /// Service for reading robot poses from Process Studio programs.
-    /// </summary>
     public class PoseReader
     {
         private readonly TxRobot _robot;
@@ -17,20 +14,18 @@ namespace ISRA.Calculations.TempComp.Services
             _robot = robot ?? throw new ArgumentNullException(nameof(robot));
         }
 
-        /// <summary>
-        /// Reads poses from a single weld operation program.
-        /// </summary>
-        /// <param name="program">Weld operation to read from</param>
-        /// <param name="nameFilters">Optional name prefixes to filter measurement points</param>
-        /// <returns>List of robot poses</returns>
-        public List<RobotPose> ReadPosesFromProgram(TxWeldOperation program, string[] nameFilters = null)
+        public List<RobotPose> ReadPosesFromProgram(
+            TxWeldOperation program,
+            FilterMode filterMode,
+            string[] namePrefixes,
+            string[] olpKeywords = null)
         {
             var result = new List<RobotPose>();
 
             if (program == null)
                 return result;
 
-            string pathName = program.Name; // Capture the path name
+            string pathName = program.Name;
 
             var locations = program.GetAllDescendants(
                 new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
@@ -40,12 +35,18 @@ namespace ISRA.Calculations.TempComp.Services
                 var loc = obj as ITxRoboticLocationOperation;
                 if (loc == null) continue;
 
-                // Filter by name prefix if specified
-                if (nameFilters != null && nameFilters.Length > 0)
+                // Apply filter based on mode
+                if (filterMode == FilterMode.Auto)
                 {
-                    if (!MeasurementPointFilter.IsMeasurementPoint(loc, nameFilters))
+                    if (!MeasurementPointFilter.IsMeasurementPoint(loc, namePrefixes))
                         continue;
                 }
+                else if (filterMode == FilterMode.Custom)
+                {
+                    if (!MeasurementPointFilter.IsMeasurementPoint(loc, namePrefixes, olpKeywords))
+                        continue;
+                }
+                // NoFilter: minden location bekerül
 
                 try
                 {
@@ -58,7 +59,7 @@ namespace ISRA.Calculations.TempComp.Services
                     result.Add(new RobotPose
                     {
                         Name = loc.Name,
-                        PathName = pathName, // Set the parent path name
+                        PathName = pathName,
                         J1 = (double)joints[0] * (180.0 / Math.PI),
                         J2 = (double)joints[1] * (180.0 / Math.PI),
                         J3 = (double)joints[2] * (180.0 / Math.PI),
@@ -76,15 +77,11 @@ namespace ISRA.Calculations.TempComp.Services
             return result;
         }
 
-        /// <summary>
-        /// Reads poses from multiple weld operation programs.
-        /// </summary>
-        /// <param name="programs">Collection of weld operations</param>
-        /// <param name="nameFilters">Optional name prefixes to filter measurement points</param>
-        /// <returns>Aggregated list of robot poses from all programs</returns>
         public List<RobotPose> ReadPosesFromPrograms(
             IEnumerable<TxWeldOperation> programs,
-            string[] nameFilters = null)
+            FilterMode filterMode,
+            string[] namePrefixes,
+            string[] olpKeywords = null)
         {
             var result = new List<RobotPose>();
 
@@ -93,7 +90,7 @@ namespace ISRA.Calculations.TempComp.Services
 
             foreach (var program in programs)
             {
-                result.AddRange(ReadPosesFromProgram(program, nameFilters));
+                result.AddRange(ReadPosesFromProgram(program, filterMode, namePrefixes, olpKeywords));
             }
 
             return result;

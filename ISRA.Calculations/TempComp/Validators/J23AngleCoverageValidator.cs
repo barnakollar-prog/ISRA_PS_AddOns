@@ -57,7 +57,12 @@ namespace ISRA.Calculations.TempComp.Validators
             else if (!minOK)
                 details += " (Need ≥2 for min)";
 
-            return CreateResult(Name, isValid, message, details);
+            return CreateResult(
+                Name, isValid,
+                 details,                                                        // Message = details szöveg
+                        "",                                                             // Details = üres
+                            $"Body range: {bodyMin:F1}° to {bodyMax:F1}°",                // BodypartValue
+                     $"TC covering max: {countMax}, TC covering min: {countMin}");  // TempCompValue
         }
     }
 }

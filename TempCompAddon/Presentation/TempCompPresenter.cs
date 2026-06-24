@@ -67,11 +67,23 @@ namespace TempCompAddon.Presentation
 
                 var bodyPoses = poseReader.ReadPosesFromPrograms(
                     _view.BodyPrograms,
-                    MeasurementPointFilter.BodyPrefixes);
+                    _view.FilterMode,
+                    _view.FilterMode == FilterMode.Custom
+                        ? _view.CustomBodyPrefixes
+                        : MeasurementPointFilter.BodyPrefixes,
+                    _view.FilterMode == FilterMode.Custom
+                        ? _view.CustomOlpKeywords
+                        : null);
 
                 var tempCompPoses = poseReader.ReadPosesFromPrograms(
                     _view.TempCompPrograms,
-                    MeasurementPointFilter.TcPrefixes);
+                    _view.FilterMode,
+                    _view.FilterMode == FilterMode.Custom
+                        ? _view.CustomTcPrefixes
+                        : MeasurementPointFilter.TcPrefixes,
+                    _view.FilterMode == FilterMode.Custom
+                        ? _view.CustomOlpKeywords
+                        : null);
 
                 // Validate poses were found
                 if (bodyPoses.Count == 0)
@@ -201,6 +213,13 @@ namespace TempCompAddon.Presentation
         TxRobot SelectedRobot { get; }
         string SelectedRobotType { get; }
         double MaxAngleThreshold { get; }
+
+        // Filter properties
+        FilterMode FilterMode { get; }                  // ← ÚJ
+        string[] CustomBodyPrefixes { get; }            // ← ÚJ
+        string[] CustomTcPrefixes { get; }              // ← ÚJ
+        string[] CustomOlpKeywords { get; }             // ← ÚJ
+
 
         // Display methods
         void DisplayValidationResults(AnalysisReport report);

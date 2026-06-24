@@ -78,6 +78,7 @@
     <Compile Include="TempComp\Services\TempCompAnalyzer.cs" />
     <Compile Include="TempComp\TempCompCalculations.cs" />
     <Compile Include="TempComp\Validators\AxisMaxCoverageValidator.cs" />
+    <Compile Include="TempComp\Validators\FilterMode.cs" />
     <Compile Include="TempComp\Validators\J23AngleCoverageValidator.cs" />
     <Compile Include="TempComp\Validators\J23RangeValidator.cs" />
     <Compile Include="TempComp\Validators\J5SymmetryValidator.cs" />

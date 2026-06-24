@@ -72,22 +72,34 @@ TC J2-3   : only the 2 largest / 2 smallest values colored:
 
 MEASUREMENT POINT FILTER
 ------------------------
-Points are identified as measurement points by two methods:
+Three filter modes are available (selectable in the UI):
 
-1. NAME PREFIX (primary)
-   Body paths : points starting with ""mp"" (case-insensitive)
-   TC paths   : points starting with ""art"" or ""temp"" (case-insensitive)
+NO FILTER
+   All locations in the selected paths are included.
+   No filtering is applied.
 
-2. OLP COMMAND TEXT (fallback, robot backup programs)
-   Points containing any of the following keywords in their
-   OLP command text are treated as measurement points:
-   - meas, cmeas   : generic / conditional measurement
-   - inline        : inline measurement
-   - VW_USER       : VW specific
-   - TECH10        : Perceptron
-   - PRC_IMT       : IMT measurement process
-   (List is extensible in MeasurementPointFilter.cs)"";
+AUTO (default)
+   Points are identified by two methods:
 
+   1. NAME PREFIX (primary)
+      Body paths : points starting with ""mp"" (case-insensitive)
+      TC paths   : points starting with ""art"" or ""temp"" (case-insensitive)
+
+   2. OLP COMMAND TEXT (fallback, robot backup programs)
+      Points containing any of the following keywords in their
+      OLP command text are treated as measurement points:
+      - meas, cmeas   : generic / conditional measurement
+      - inline        : inline measurement
+      - VW_USER       : VW specific
+      - TECH10        : Perceptron
+      - PRC_IMT       : IMT measurement process
+
+CUSTOM
+   User-defined prefixes and OLP keywords.
+   Enter comma-separated values in the filter fields:
+   - Body prefixes  : name prefixes for body measurement points
+   - TC prefixes    : name prefixes for TC measurement points
+   - OLP keywords   : fallback keywords in OLP command text"";
 DEVELOPED BY
 ------------
    ISRA Vision / CAD & Simulation Team

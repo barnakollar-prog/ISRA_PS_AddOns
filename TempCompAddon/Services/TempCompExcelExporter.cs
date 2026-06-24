@@ -122,12 +122,13 @@ namespace TempCompAddon.Services
             row += 2;
 
             // Column headers
-            ws.Cells[row, 1].Value = "Validator";
-            ws.Cells[row, 2].Value = "Status";
-            ws.Cells[row, 3].Value = "Message";
-            ws.Cells[row, 4].Value = "Details";
+            ws.Cells[row, 1].Value = "Criterion";
+            ws.Cells[row, 2].Value = "Bodypart";
+            ws.Cells[row, 3].Value = "Temp Comp";
+            ws.Cells[row, 4].Value = "Message";
+            ws.Cells[row, 5].Value = "Status";
 
-            using (var range = ws.Cells[row, 1, row, 4])
+            using (var range = ws.Cells[row, 1, row, 5])
             {
                 range.Style.Font.Bold = true;
                 range.Style.Fill.PatternType = ExcelFillStyle.Solid;
@@ -140,14 +141,18 @@ namespace TempCompAddon.Services
             foreach (var result in data.ValidationReport.ValidationResults)
             {
                 ws.Cells[row, 1].Value = result.CriterionName;
-                ws.Cells[row, 2].Value = result.IsValid ? "PASS" : "FAIL";
-                ws.Cells[row, 2].Style.Font.Bold = true;
-                ws.Cells[row, 2].Style.Font.Color.SetColor(result.IsValid ? Color.Green : Color.Red);
-                ws.Cells[row, 3].Value = result.Message;
-                ws.Cells[row, 4].Value = result.Details;
+                ws.Cells[row, 2].Value = result.BodypartValue ?? "";
+                ws.Cells[row, 3].Value = result.TempCompValue ?? "";
+                ws.Cells[row, 4].Value = result.Message ?? "";
+                ws.Cells[row, 5].Value = result.IsValid ? "PASS" : "FAIL";
+                ws.Cells[row, 5].Style.Font.Bold = true;
+                ws.Cells[row, 5].Style.Font.Color.SetColor(result.IsValid ? Color.Green : Color.Red);
 
-                using (var range = ws.Cells[row, 1, row, 4])
+                Color rowColor = result.IsValid ? Color.FromArgb(198, 239, 206) : Color.FromArgb(255, 199, 206);
+                using (var range = ws.Cells[row, 1, row, 5])
                 {
+                    range.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    range.Style.Fill.BackgroundColor.SetColor(rowColor);
                     range.Style.Border.BorderAround(ExcelBorderStyle.Thin);
                 }
                 row++;
@@ -158,6 +163,7 @@ namespace TempCompAddon.Services
             ws.Column(2).AutoFit();
             ws.Column(3).AutoFit();
             ws.Column(4).AutoFit();
+            ws.Column(5).AutoFit();
         }
 
         /// <summary>
@@ -188,18 +194,20 @@ namespace TempCompAddon.Services
 
             // Column headers
             ws.Cells[row, 1].Value = "Body Point";
-            ws.Cells[row, 2].Value = "J2-3";
-            ws.Cells[row, 3].Value = "J4";
-            ws.Cells[row, 4].Value = "J5";
-            ws.Cells[row, 5].Value = "J6";
-            ws.Cells[row, 6].Value = "TC Point";
-            ws.Cells[row, 7].Value = "TC J2-3";
-            ws.Cells[row, 8].Value = "TC J4";
-            ws.Cells[row, 9].Value = "TC J5";
-            ws.Cells[row, 10].Value = "TC J6";
-            ws.Cells[row, 11].Value = "Max Diff";
+            ws.Cells[row, 2].Value = "Body Path";      // ← ÚJ
+            ws.Cells[row, 3].Value = "J2-3";
+            ws.Cells[row, 4].Value = "J4";
+            ws.Cells[row, 5].Value = "J5";
+            ws.Cells[row, 6].Value = "J6";
+            ws.Cells[row, 7].Value = "TC Point";
+            ws.Cells[row, 8].Value = "TC Path";        // ← ÚJ
+            ws.Cells[row, 9].Value = "TC J2-3";
+            ws.Cells[row, 10].Value = "TC J4";
+            ws.Cells[row, 11].Value = "TC J5";
+            ws.Cells[row, 12].Value = "TC J6";
+            ws.Cells[row, 13].Value = "Max Diff";
 
-            using (var range = ws.Cells[row, 1, row, 11])
+            using (var range = ws.Cells[row, 1, row, 13])
             {
                 range.Style.Font.Bold = true;
                 range.Style.Fill.PatternType = ExcelFillStyle.Solid;
@@ -214,102 +222,93 @@ namespace TempCompAddon.Services
                 var bodyPose = result.BodyPose;
                 var tcPose = result.NearestTcPose;
 
-                // Calculate J2-3 angles
                 double bodyJ23 = data.RobotConfiguration.CalculateJ23Angle(bodyPose);
-                double tcJ23 = data.RobotConfiguration.CalculateJ23Angle(tcPose);
-
-                // Normalize angles
                 double bodyJ4 = data.RobotConfiguration.NormalizeAngle180(bodyPose.J4);
                 double bodyJ6 = data.RobotConfiguration.NormalizeAngle180(bodyPose.J6);
-                double tcJ4 = data.RobotConfiguration.NormalizeAngle180(tcPose.J4);
-                double tcJ6 = data.RobotConfiguration.NormalizeAngle180(tcPose.J6);
 
-                // Calculate differences
-                double d23 = tcJ23 - bodyJ23;
-                double d4 = data.RobotConfiguration.NormalizeAngle180(tcPose.J4 - bodyPose.J4);
-                double d5 = tcPose.J5 - bodyPose.J5;
-                double d6 = data.RobotConfiguration.NormalizeAngle180(tcPose.J6 - bodyPose.J6);
-                double maxDiff = Math.Max(Math.Max(Math.Abs(d23), Math.Abs(d4)),
-                                          Math.Max(Math.Abs(d5), Math.Abs(d6)));
-
-                // Body Point
                 ws.Cells[row, 1].Value = bodyPose.Name;
+                ws.Cells[row, 2].Value = bodyPose.PathName ?? "";              // ← ÚJ
 
-                // Body J2-3
-                ws.Cells[row, 2].Value = bodyJ23;
-                ws.Cells[row, 2].Style.Numberformat.Format = "0.00";
-
-                // Body J4
-                ws.Cells[row, 3].Value = bodyJ4;
+                ws.Cells[row, 3].Value = bodyJ23;
                 ws.Cells[row, 3].Style.Numberformat.Format = "0.00";
-
-                // Body J5
-                ws.Cells[row, 4].Value = bodyPose.J5;
+                ws.Cells[row, 4].Value = bodyJ4;
                 ws.Cells[row, 4].Style.Numberformat.Format = "0.00";
-
-                // Body J6
-                ws.Cells[row, 5].Value = bodyJ6;
+                ws.Cells[row, 5].Value = bodyPose.J5;
                 ws.Cells[row, 5].Style.Numberformat.Format = "0.00";
+                ws.Cells[row, 6].Value = bodyJ6;
+                ws.Cells[row, 6].Style.Numberformat.Format = "0.00";
 
-                // TC Point
-                ws.Cells[row, 6].Value = tcPose.Name;
-
-                // TC J2-3
-                ws.Cells[row, 7].Value = tcJ23;
-                ws.Cells[row, 7].Style.Numberformat.Format = "0.00";
-                if (Math.Abs(d23) > data.MaxAngleThreshold)
+                if (tcPose != null)
                 {
-                    ws.Cells[row, 7].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[row, 7].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                    double tcJ23 = data.RobotConfiguration.CalculateJ23Angle(tcPose);
+                    double tcJ4 = data.RobotConfiguration.NormalizeAngle180(tcPose.J4);
+                    double tcJ6 = data.RobotConfiguration.NormalizeAngle180(tcPose.J6);
+
+                    double d23 = tcJ23 - bodyJ23;
+                    double d4 = data.RobotConfiguration.NormalizeAngle180(tcPose.J4 - bodyPose.J4);
+                    double d5 = tcPose.J5 - bodyPose.J5;
+                    double d6 = data.RobotConfiguration.NormalizeAngle180(tcPose.J6 - bodyPose.J6);
+                    double maxDiff = Math.Max(Math.Max(Math.Abs(d23), Math.Abs(d4)),
+                                              Math.Max(Math.Abs(d5), Math.Abs(d6)));
+
+                    ws.Cells[row, 7].Value = tcPose.Name;
+                    ws.Cells[row, 8].Value = tcPose.PathName ?? "";            // ← ÚJ
+
+                    ws.Cells[row, 9].Value = tcJ23;
+                    ws.Cells[row, 9].Style.Numberformat.Format = "0.00";
+                    if (Math.Abs(d23) > data.MaxAngleThreshold)
+                    {
+                        ws.Cells[row, 9].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[row, 9].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                    }
+
+                    ws.Cells[row, 10].Value = tcJ4;
+                    ws.Cells[row, 10].Style.Numberformat.Format = "0.00";
+                    if (Math.Abs(d4) > data.MaxAngleThreshold)
+                    {
+                        ws.Cells[row, 10].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[row, 10].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                    }
+
+                    ws.Cells[row, 11].Value = tcPose.J5;
+                    ws.Cells[row, 11].Style.Numberformat.Format = "0.00";
+                    if (Math.Abs(d5) > data.MaxAngleThreshold)
+                    {
+                        ws.Cells[row, 11].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[row, 11].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                    }
+
+                    ws.Cells[row, 12].Value = tcJ6;
+                    ws.Cells[row, 12].Style.Numberformat.Format = "0.00";
+                    if (Math.Abs(d6) > data.MaxAngleThreshold)
+                    {
+                        ws.Cells[row, 12].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[row, 12].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                    }
+
+                    ws.Cells[row, 13].Value = maxDiff;
+                    ws.Cells[row, 13].Style.Numberformat.Format = "0.00";
+                    if (maxDiff > data.MaxAngleThreshold)
+                    {
+                        ws.Cells[row, 13].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[row, 13].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
+                        ws.Cells[row, 13].Style.Font.Bold = true;
+                    }
+                }
+                else
+                {
+                    ws.Cells[row, 7].Value = "N/A";
                 }
 
-                // TC J4
-                ws.Cells[row, 8].Value = tcJ4;
-                ws.Cells[row, 8].Style.Numberformat.Format = "0.00";
-                if (Math.Abs(d4) > data.MaxAngleThreshold)
-                {
-                    ws.Cells[row, 8].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[row, 8].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
-                }
-
-                // TC J5
-                ws.Cells[row, 9].Value = tcPose.J5;
-                ws.Cells[row, 9].Style.Numberformat.Format = "0.00";
-                if (Math.Abs(d5) > data.MaxAngleThreshold)
-                {
-                    ws.Cells[row, 9].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[row, 9].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
-                }
-
-                // TC J6
-                ws.Cells[row, 10].Value = tcJ6;
-                ws.Cells[row, 10].Style.Numberformat.Format = "0.00";
-                if (Math.Abs(d6) > data.MaxAngleThreshold)
-                {
-                    ws.Cells[row, 10].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[row, 10].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
-                }
-
-                // Max Diff
-                ws.Cells[row, 11].Value = maxDiff;
-                ws.Cells[row, 11].Style.Numberformat.Format = "0.00";
-                if (maxDiff > data.MaxAngleThreshold)
-                {
-                    ws.Cells[row, 11].Style.Fill.PatternType = ExcelFillStyle.Solid;
-                    ws.Cells[row, 11].Style.Fill.BackgroundColor.SetColor(Color.LightCoral);
-                    ws.Cells[row, 11].Style.Font.Bold = true;
-                }
-
-                using (var range = ws.Cells[row, 1, row, 11])
+                using (var range = ws.Cells[row, 1, row, 13])
                 {
                     range.Style.Border.BorderAround(ExcelBorderStyle.Thin);
                 }
-
                 row++;
             }
 
             // Auto-fit columns
-            for (int col = 1; col <= 11; col++)
+            for (int col = 1; col <= 13; col++)
             {
                 ws.Column(col).AutoFit();
             }

@@ -28,5 +28,13 @@ namespace ISRA.Calculations.TempComp.Validators
         {
             return new ValidationResult(criterionName, isValid, message, details);
         }
+        protected ValidationResult CreateResult(string criterionName, bool isValid, string message, string details, string bodypartValue, string tempCompValue)
+        {
+            return new ValidationResult(criterionName, isValid, message, details)
+            {
+                BodypartValue = bodypartValue,
+                TempCompValue = tempCompValue
+            };
+        }
     }
 }

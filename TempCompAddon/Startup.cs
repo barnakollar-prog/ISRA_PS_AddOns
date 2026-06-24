@@ -1,14 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.Windows.Forms;
-using Tecnomatix.Engineering;
-using Tecnomatix.Engineering.Ui;
-using ISRA.Calculations.TempComp;
+﻿using ISRA.Calculations.TempComp;
 using ISRA.Calculations.TempComp.Domain;
 using ISRA.Calculations.TempComp.Domain.Results;
 using ISRA.Calculations.TempComp.RobotConfiguration;
 using ISRA.Core.Domain;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Linq;
+using System.Windows.Forms;
+using Tecnomatix.Engineering;
+using Tecnomatix.Engineering.Ui;
 using TempCompAddon.Presentation;
 
 namespace TempCompAddon
@@ -52,6 +53,16 @@ namespace TempCompAddon
         private Button btnRemoveBodyPaths;
         private Button btnRemoveTempCompPaths;
         private Button btnHelp;
+
+        // Filter controls
+        private RadioButton rbFilterNone;
+        private RadioButton rbFilterAuto;
+        private RadioButton rbFilterCustom;
+        private TextBox txtBodyPrefixes;
+        private TextBox txtTcPrefixes;
+        private TextBox txtOlpKeywords;
+        // 
+
         private NumericUpDown nudStepSize;
         private Button btnAnalyze;
         private Button btnExport;
@@ -344,6 +355,56 @@ namespace TempCompAddon
             this.Controls.Add(grpSettings);
             y += 58;
 
+            // ── Filter GroupBox ───────────────────────────────────
+            var grpFilter = new GroupBox
+            {
+                Text = "Measurement Point Filter",
+                Left = lx,
+                Top = y,
+                Width = 765,
+                Height = 110,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            rbFilterNone = new RadioButton { Text = "No Filter", Left = 8, Top = 20, Width = 90, Height = 20 };
+            rbFilterAuto = new RadioButton { Text = "Auto", Left = 105, Top = 20, Width = 70, Height = 20, Checked = true };
+            rbFilterCustom = new RadioButton { Text = "Custom", Left = 180, Top = 20, Width = 80, Height = 20 };
+            grpFilter.Controls.Add(rbFilterNone);
+            grpFilter.Controls.Add(rbFilterAuto);
+            grpFilter.Controls.Add(rbFilterCustom);
+
+            grpFilter.Controls.Add(new Label { Text = "Body prefixes:", Left = 8, Top = 50, Width = 90, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            txtBodyPrefixes = new TextBox { Left = 102, Top = 48, Width = 200, Height = 22, Text = "mp", Enabled = false };
+            grpFilter.Controls.Add(txtBodyPrefixes);
+
+            grpFilter.Controls.Add(new Label { Text = "TC prefixes:", Left = 310, Top = 50, Width = 80, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            txtTcPrefixes = new TextBox { Left = 394, Top = 48, Width = 200, Height = 22, Text = "art, temp", Enabled = false };
+            grpFilter.Controls.Add(txtTcPrefixes);
+
+            grpFilter.Controls.Add(new Label { Text = "OLP keywords:", Left = 8, Top = 78, Width = 90, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            txtOlpKeywords = new TextBox
+            {
+                Left = 102,
+                Top = 76,
+                Width = 650,
+                Height = 22,
+                Text = "meas, cmeas, inline, VW_USER, TECH10, PRC_IMT",
+                Enabled = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpFilter.Controls.Add(txtOlpKeywords);
+
+            // Enable/disable textboxes based on radio selection
+            rbFilterCustom.CheckedChanged += (s, e) =>
+            {
+                txtBodyPrefixes.Enabled = rbFilterCustom.Checked;
+                txtTcPrefixes.Enabled = rbFilterCustom.Checked;
+                txtOlpKeywords.Enabled = rbFilterCustom.Checked;
+            };
+
+            this.Controls.Add(grpFilter);
+            y += 118;
+
             // ── Analyze button ────────────────────────────────────
             btnAnalyze = new Button
             {
@@ -391,6 +452,7 @@ namespace TempCompAddon
             tabValidation.Controls.Add(lstValidation);
 
             // Tab 2: Nearest TC
+            // Tab 2: Nearest TC
             var tabNearest = new TabPage { Text = "Nearest TC Point" };
             lstNearestTc = new ListView
             {
@@ -401,11 +463,13 @@ namespace TempCompAddon
                 Font = new Font("Consolas", 8)
             };
             lstNearestTc.Columns.Add("Body Point", 120);
+            lstNearestTc.Columns.Add("Body Path", 120);   // ← ÚJ
             lstNearestTc.Columns.Add("J2-3", 60);
             lstNearestTc.Columns.Add("J4", 60);
             lstNearestTc.Columns.Add("J5", 60);
             lstNearestTc.Columns.Add("J6", 60);
             lstNearestTc.Columns.Add("TC Point", 120);
+            lstNearestTc.Columns.Add("TC Path", 120);     // ← ÚJ
             lstNearestTc.Columns.Add("TC J2-3", 60);
             lstNearestTc.Columns.Add("TC J4", 60);
             lstNearestTc.Columns.Add("TC J5", 60);
@@ -604,6 +668,36 @@ namespace TempCompAddon
             }
         }
         public double MaxAngleThreshold => (double)nudStepSize.Value;
+        public FilterMode FilterMode
+        {
+            get
+            {
+                if (rbFilterNone.Checked) return FilterMode.NoFilter;
+                if (rbFilterCustom.Checked) return FilterMode.Custom;
+                return FilterMode.Auto;
+            }
+        }
+
+        public string[] CustomBodyPrefixes =>
+            txtBodyPrefixes.Text
+                .Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
+
+        public string[] CustomTcPrefixes =>
+            txtTcPrefixes.Text
+                .Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
+
+        public string[] CustomOlpKeywords =>
+            txtOlpKeywords.Text
+                .Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .ToArray();
 
         public void DisplayValidationResults(AnalysisReport report)
         {

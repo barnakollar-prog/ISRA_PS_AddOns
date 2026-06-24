@@ -29,5 +29,8 @@ namespace ISRA.Core.Domain
         /// True if validation passed (Status == Valid).
         /// </summary>
         bool IsValid { get; }
+
+        string BodypartValue { get; }    // ← NEW
+        string TempCompValue { get; }    // ← NEW
     }
 }

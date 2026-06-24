@@ -84,5 +84,57 @@ namespace ISRA.Calculations.TempComp
 
             return false;
         }
+        /// <summary>
+        /// Overload with custom OLP keywords.
+        /// </summary>
+        public static bool IsMeasurementPoint(
+            ITxRoboticLocationOperation loc,
+            string[] namePrefixes,
+            string[] olpKeywords)
+        {
+            if (loc == null) return false;
+
+            // ── Level 1: Name prefix ──────────────────────────────
+            if (namePrefixes != null && namePrefixes.Length > 0)
+            {
+                string nameLower = loc.Name.ToLower();
+                foreach (var prefix in namePrefixes)
+                {
+                    if (!string.IsNullOrEmpty(prefix) &&
+                        nameLower.StartsWith(prefix.ToLower()))
+                        return true;
+                }
+            }
+
+            // ── Level 2: Custom OLP keywords ─────────────────────
+            if (olpKeywords != null && olpKeywords.Length > 0)
+            {
+                try
+                {
+                    var roboLoc = loc as ITxRoboticOperation;
+                    if (roboLoc != null && roboLoc.Commands != null)
+                    {
+                        foreach (ITxObject cmdObj in roboLoc.Commands)
+                        {
+                            var cmd = cmdObj as TxRoboticCommand;
+                            if (cmd == null) continue;
+
+                            string cmdText = (cmd.Text ?? "").ToLower();
+                            string cmdName = (cmd.Name ?? "").ToLower();
+
+                            foreach (var kw in olpKeywords)
+                            {
+                                string kwLower = kw.ToLower();
+                                if (cmdText.Contains(kwLower) || cmdName.Contains(kwLower))
+                                    return true;
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            return false;
+        }
     }
 }

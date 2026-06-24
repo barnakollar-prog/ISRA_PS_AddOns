@@ -38,32 +38,65 @@ namespace ISRA.Calculations.TempComp.Validators
             if (input.TempCompPoses == null || input.TempCompPoses.Count == 0)
                 return CreateResult(Name, false, "No temp comp poses provided", "");
 
-            // Find body max
-            double bodyMax = double.MinValue;
+            var config = input.RobotConfiguration;
+
+            // Find body max (for comparison: absolute/normalized; for display: actual value)
+            double bodyMaxAbs = double.MinValue;
+            double bodyMaxDisplay = double.MinValue;  // ← visszakerül J4/J6-hoz
+            double bodyMaxPositive = double.MinValue;
+            double bodyMinNegative = double.MaxValue;
             foreach (var pose in input.BodyPoses)
             {
                 double value = _selector(pose);
-                if (_useAbsoluteValue) value = Math.Abs(value);
-                if (value > bodyMax) bodyMax = value;
+                if (_axisName == "J4" || _axisName == "J6")
+                    value = config.NormalizeAngle180(value);
+                double absValue = _useAbsoluteValue ? Math.Abs(value) : value;
+                if (absValue > bodyMaxAbs)
+                {
+                    bodyMaxAbs = absValue;
+                    bodyMaxDisplay = value;  // ← J4/J6-hoz
+                }
+                if (_axisName == "J5" && value > bodyMaxPositive) bodyMaxPositive = value;
+                if (_axisName == "J5" && value < bodyMinNegative) bodyMinNegative = value;
             }
 
             // Find TC max and check if it covers body max
-            double tcMax = double.MinValue;
+            double tcMaxAbs = double.MinValue;
+            double tcMaxDisplay = double.MinValue;    // ← visszakerül J4/J6-hoz
+            double tcMaxPositive = double.MinValue;
+            double tcMinNegative = double.MaxValue;
             bool covered = false;
             foreach (var pose in input.TempCompPoses)
             {
                 double value = _selector(pose);
-                if (_useAbsoluteValue) value = Math.Abs(value);
-                if (value > tcMax) tcMax = value;
-                if (value >= bodyMax) covered = true;
+                if (_axisName == "J4" || _axisName == "J6")
+                    value = config.NormalizeAngle180(value);
+                double absValue = _useAbsoluteValue ? Math.Abs(value) : value;
+                if (absValue > tcMaxAbs)
+                {
+                    tcMaxAbs = absValue;
+                    tcMaxDisplay = value;  // ← J4/J6-hoz
+                }
+                if (_axisName == "J5" && value > tcMaxPositive) tcMaxPositive = value;
+                if (_axisName == "J5" && value < tcMinNegative) tcMinNegative = value;
+                if (absValue >= bodyMaxAbs) covered = true;
             }
 
-            string message = $"Body max: {bodyMax:F1}°, TC max: {tcMax:F1}°";
-            string details = covered 
-                ? "TC covers body maximum" 
-                : $"TC does not reach body maximum (gap: {bodyMax - tcMax:F1}°)";
+            // Build display strings
+            string bodypartStr = _axisName == "J5"
+                ? $"Body max: +{bodyMaxPositive:F1}° / {bodyMinNegative:F1}°"
+                : $"Body max: {bodyMaxDisplay:F1}°";
 
-            return CreateResult(Name, covered, message, details);
+            string tempCompStr = _axisName == "J5"
+                ? $"TC max: +{tcMaxPositive:F1}° / {tcMinNegative:F1}°"
+                : $"TC max: {tcMaxDisplay:F1}°";
+
+            return CreateResult(
+                Name, covered,
+                covered ? "TC covers body maximum" : $"TC does not reach body maximum (gap: {bodyMaxAbs - tcMaxAbs:F1}°)",
+                "",
+                bodypartStr,
+                tempCompStr);
         }
 
         /// <summary>

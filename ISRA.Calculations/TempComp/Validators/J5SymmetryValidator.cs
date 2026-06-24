@@ -33,7 +33,12 @@ namespace ISRA.Calculations.TempComp.Validators
                 ? "J5 distribution is symmetric" 
                 : $"Need at least {half} of each sign";
 
-            return CreateResult(Name, isValid, message, details);
+            return CreateResult(
+                Name, isValid,
+                isValid ? "J5 distribution is symmetric" : $"Need at least {half} of each sign",
+                "",
+                "",                                                              // BodypartValue = üres
+                $"Negative: {negCount}, Positive: {posCount} (Total: {total})"); // TempCompValue
         }
     }
 }

@@ -28,9 +28,9 @@ namespace TempCompAddon.Presentation
             foreach (var result in report.ValidationResults)
             {
                 var item = new ListViewItem(result.CriterionName);
-                item.SubItems.Add(result.Message);
-                item.SubItems.Add(""); // Placeholder for TC column if needed
-                item.SubItems.Add(result.Details);
+                item.SubItems.Add(result.BodypartValue ?? "");
+                item.SubItems.Add(result.TempCompValue ?? "");
+                item.SubItems.Add(result.Message ?? "");
                 item.SubItems.Add(result.IsValid ? "OK" : "NOK");
 
                 item.BackColor = result.IsValid ? ColorPalette.OKLight : ColorPalette.NOKLight;
@@ -47,10 +47,10 @@ namespace TempCompAddon.Presentation
         /// Formats nearest TC point results into a ListView.
         /// </summary>
         public void FormatNearestTcResults(
-            List<NearestTcResult> results,
-            ListView listView,
-            double threshold,
-            IRobotConfiguration config)
+    List<NearestTcResult> results,
+    ListView listView,
+    double threshold,
+    IRobotConfiguration config)
         {
             listView.Items.Clear();
 
@@ -66,6 +66,7 @@ namespace TempCompAddon.Presentation
                 item.UseItemStyleForSubItems = false;
 
                 // Body pose columns
+                item.SubItems.Add(b.PathName ?? "");                                          // ← ÚJ
                 item.SubItems.Add(string.Format("{0:F2}", config.CalculateJ23Angle(b)));
                 item.SubItems.Add(string.Format("{0:F2}", config.NormalizeAngle180(b.J4)));
                 item.SubItems.Add(string.Format("{0:F2}", b.J5));
@@ -79,6 +80,7 @@ namespace TempCompAddon.Presentation
                     double d6 = config.NormalizeAngle180(t.J6 - b.J6);
 
                     item.SubItems.Add(t.Name);
+                    item.SubItems.Add(t.PathName ?? "");                                      // ← ÚJ
 
                     var s23 = item.SubItems.Add(string.Format("{0:F2}", config.CalculateJ23Angle(t)));
                     s23.BackColor = ColorPalette.GetDifferenceColor(d23, threshold);
@@ -101,6 +103,7 @@ namespace TempCompAddon.Presentation
                 else
                 {
                     item.SubItems.Add("N/A");
+                    item.SubItems.Add("");                                                     // ← ÚJ placeholder
                     for (int k = 0; k < 5; k++) item.SubItems.Add("-");
                 }
 
