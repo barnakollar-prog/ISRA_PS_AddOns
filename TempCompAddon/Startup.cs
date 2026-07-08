@@ -512,45 +512,44 @@ namespace TempCompAddon
             tabControl.TabPages.Add(tabRaw);
             this.Controls.Add(tabControl);
 
-            // Calculate button positions from bottom
-            int buttonY = this.ClientSize.Height - 76; // 76px from bottom for Export + Help + spacing
+            // ── Bottom button panel (docked) ──────────────────────
+            var pnlButtons = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 72,
+                Padding = new Padding(lx, 4, lx, 4)
+            };
 
-            // ── Export button ─────────────────────────────────────
             btnExport = new Button
             {
                 Text = "Export to Excel",
-                Left = lx,
-                Top = buttonY,
-                Width = 765,
+                Dock = DockStyle.Top,
                 Height = 32,
                 BackColor = Color.FromArgb(0, 120, 0),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+                Font = new Font("Segoe UI", 9, FontStyle.Bold)
             };
             btnExport.Click += OnExport;
-            this.Controls.Add(btnExport);
-            btnExport.BringToFront();
-            buttonY += 38; // 32 height + 6 spacing
 
-            // ── Help button ───────────────────────────────────────
             btnHelp = new Button
             {
                 Text = "Help / About",
-                Left = lx,
-                Top = buttonY,
-                Width = 765,
+                Dock = DockStyle.Bottom,
                 Height = 28,
                 BackColor = Color.FromArgb(60, 60, 60),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9),
-                Anchor = AnchorStyles.Bottom | AnchorStyles.Left | AnchorStyles.Right
+                Font = new Font("Segoe UI", 9)
             };
             btnHelp.Click += (s, e) => HelpAbout.ShowAbout();
-            this.Controls.Add(btnHelp);
-            btnHelp.BringToFront();
+
+            pnlButtons.Controls.Add(btnExport);
+            pnlButtons.Controls.Add(btnHelp);
+            this.Controls.Add(pnlButtons);
+
+            // ── Adjust TabControl height to end above the button panel ──
+            tabControl.Height = this.ClientSize.Height - tabControl.Top - pnlButtons.Height - 8;
         }
 
         // ── Pick from PS ──────────────────────────────────────────

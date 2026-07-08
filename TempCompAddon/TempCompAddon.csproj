@@ -25,7 +25,7 @@
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugType>pdbonly</DebugType>
     <Optimize>true</Optimize>
-    <OutputPath>..\..\..\..\..\..\Program Files\Tecnomatix_2206.0\eMPower\DotNetCommands\TempComp\</OutputPath>
+    <OutputPath>..\..\..\..\..\..\Program Files\Tecnomatix_2408\eMPower\DotNetCommands\TempComp\</OutputPath>
     <DefineConstants>TRACE</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
@@ -45,13 +45,16 @@
       <HintPath>..\packages\EPPlusFree.4.5.3.8\lib\net40\EPPlusFree.dll</HintPath>
     </Reference>
     <Reference Include="Tecnomatix.Engineering">
-      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2206.0\eMPower\Tecnomatix.Engineering.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2408\eMPower\Tecnomatix.Engineering.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Tecnomatix.Engineering.Olp">
-      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2206.0\eMPower\Tecnomatix.Engineering.Olp.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2408\eMPower\Tecnomatix.Engineering.Olp.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="Tecnomatix.Engineering.Ui">
-      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2206.0\eMPower32\Tecnomatix.Engineering.Ui.dll</HintPath>
+      <HintPath>..\..\..\..\..\..\Program Files\Tecnomatix_2408\eMPower32\Tecnomatix.Engineering.Ui.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
