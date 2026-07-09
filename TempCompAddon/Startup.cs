@@ -622,29 +622,41 @@ namespace TempCompAddon
             int found = 0;
             foreach (ITxObject obj in items)
             {
+                // 1. Először WeldOperation — ezt adjuk hozzá közvetlenül
                 var prog = obj as TxWeldOperation;
-                if (prog == null) continue;
-                found++;
-
-                if (_pickMode == PickMode.Body)
+                if (prog != null)
                 {
-                    if (!_bodyPrograms.Contains(prog))
+                    found++;
+                    if (_pickMode == PickMode.Body)
                     {
-                        _bodyPrograms.Add(prog);
-                        lstBodyPaths.Items.Add(new ListViewItem(prog.Name));
+                        if (!_bodyPrograms.Contains(prog))
+                        {
+                            _bodyPrograms.Add(prog);
+                            lstBodyPaths.Items.Add(new ListViewItem(prog.Name));
+                        }
                     }
+                    else if (_pickMode == PickMode.TempComp)
+                    {
+                        if (!_tempCompPrograms.Contains(prog))
+                        {
+                            _tempCompPrograms.Add(prog);
+                            lstTempCompPaths.Items.Add(new ListViewItem(prog.Name));
+                        }
+                    }
+                    continue;
                 }
-                else if (_pickMode == PickMode.TempComp)
+
+                // 2. Compound vagy Generic Robotic Operation → kibontjuk
+                var compound = obj as ITxCompoundOperation;
+                if (compound != null)
                 {
-                    if (!_tempCompPrograms.Contains(prog))
-                    {
-                        _tempCompPrograms.Add(prog);
-                        lstTempCompPaths.Items.Add(new ListViewItem(prog.Name));
-                    }
+                    var children = compound.GetAllDescendants(
+                        new TxTypeFilter(typeof(TxWeldOperation)));
+                    found += AddFromSelection(children);
+                    continue;
                 }
             }
             return found;
-        
         }
 
         // ── Analyze ───────────────────────────────────────────────
