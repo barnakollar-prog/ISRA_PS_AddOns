@@ -36,33 +36,35 @@ namespace ISRA.Calculations.TempComp.Validators
 
             // Count how many TC poses cover the extremes
             int countMax = 0, countMin = 0;
+            // TC min/max for display
+            double tcMin = double.MaxValue, tcMax = double.MinValue;
             foreach (var pose in input.TempCompPoses)
             {
                 double angle = config.CalculateJ23Angle(pose);
-                if (angle >= bodyMax) countMax++;
-                if (angle <= bodyMin) countMin++;
+                if (angle > tcMax) tcMax = angle;
+                if (angle < tcMin) tcMin = angle;
+                if (angle >= bodyMax) countMax++;    // ← ez hiányzott
+                if (angle <= bodyMin) countMin++;    // ← ez hiányzott
             }
 
             bool maxOK = countMax >= 2;
             bool minOK = countMin >= 2;
             bool isValid = maxOK && minOK;
 
-            string message = $"Body range: {bodyMin:F1}° to {bodyMax:F1}°";
-            string details = $"TC covering max: {countMax}, TC covering min: {countMin}";
-
+            string coveringInfo = $"TC covering max: {countMax}, TC covering min: {countMin}";
             if (!maxOK && !minOK)
-                details += " (Need ≥2 for both)";
+                coveringInfo += " (Need ≥2 for both)";
             else if (!maxOK)
-                details += " (Need ≥2 for max)";
+                coveringInfo += " (Need ≥2 for max)";
             else if (!minOK)
-                details += " (Need ≥2 for min)";
+                coveringInfo += " (Need ≥2 for min)";
 
             return CreateResult(
                 Name, isValid,
-                 details,                                                        // Message = details szöveg
-                        "",                                                             // Details = üres
-                            $"Body range: {bodyMin:F1}° to {bodyMax:F1}°",                // BodypartValue
-                     $"TC covering max: {countMax}, TC covering min: {countMin}");  // TempCompValue
+                coveringInfo,                                       // Message → Details oszlop
+                "",
+                $"Body range: {bodyMin:F1}° to {bodyMax:F1}°",     // BodypartValue
+                $"TC range: {tcMin:F1}° to {tcMax:F1}°");          // TempCompValue
         }
     }
 }

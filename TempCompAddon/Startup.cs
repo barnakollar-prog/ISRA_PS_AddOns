@@ -94,6 +94,7 @@ namespace TempCompAddon
             this.FormClosing += OnFormClosing;
             BuildUI();
             TxApplication.ActiveSelection.ItemsSet += OnSelectionChanged;
+            TxApplication.ActiveSelection.ItemsAdded += OnSelectionAdded;
         }
 
         private void BuildUI()
@@ -610,7 +611,12 @@ namespace TempCompAddon
             if (_pickMode == PickMode.None) return;
             AddFromSelection(TxApplication.ActiveSelection.GetItems());
         }
-
+        // ── ÚJ: shift-tel bővített kijelölés kezelése (2408) ──
+        private void OnSelectionAdded(object sender, TxSelection_ItemsAddedEventArgs e)
+        {
+            if (_pickMode == PickMode.None) return;
+            AddFromSelection(TxApplication.ActiveSelection.GetItems());
+        }
         private int AddFromSelection(TxObjectList items)
         {
             int found = 0;
@@ -785,6 +791,7 @@ namespace TempCompAddon
             try
             {
                 TxApplication.ActiveSelection.ItemsSet -= OnSelectionChanged;
+                TxApplication.ActiveSelection.ItemsAdded -= OnSelectionAdded;
             }
             catch { }
         }

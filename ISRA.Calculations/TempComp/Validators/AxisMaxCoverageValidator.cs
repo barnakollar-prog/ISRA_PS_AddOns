@@ -65,7 +65,7 @@ namespace ISRA.Calculations.TempComp.Validators
             double tcMaxDisplay = double.MinValue;    // ← visszakerül J4/J6-hoz
             double tcMaxPositive = double.MinValue;
             double tcMinNegative = double.MaxValue;
-            bool covered = false;
+            int coveringCount = 0;
             foreach (var pose in input.TempCompPoses)
             {
                 double value = _selector(pose);
@@ -79,7 +79,7 @@ namespace ISRA.Calculations.TempComp.Validators
                 }
                 if (_axisName == "J5" && value > tcMaxPositive) tcMaxPositive = value;
                 if (_axisName == "J5" && value < tcMinNegative) tcMinNegative = value;
-                if (absValue >= bodyMaxAbs) covered = true;
+                if (absValue >= bodyMaxAbs) coveringCount++;
             }
 
             // Build display strings
@@ -90,10 +90,12 @@ namespace ISRA.Calculations.TempComp.Validators
             string tempCompStr = _axisName == "J5"
                 ? $"TC max: +{tcMaxPositive:F1}° / {tcMinNegative:F1}°"
                 : $"TC max: {tcMaxDisplay:F1}°";
-
+            bool covered = coveringCount >= 2;
             return CreateResult(
                 Name, covered,
-                covered ? "TC covers body maximum" : $"TC does not reach body maximum (gap: {bodyMaxAbs - tcMaxAbs:F1}°)",
+                covered
+                    ? $"TC covers body maximum ({coveringCount} points)"
+                    : $"TC coverage insufficient: {coveringCount} point(s) reach body max (need ≥2)",
                 "",
                 bodypartStr,
                 tempCompStr);
