@@ -103,7 +103,7 @@ CUSTOM
 DEVELOPED BY
 ------------
    ISRA Vision / CAD & Simulation Team
-   Last updated: June 2026";
+   Last updated: July 2026";
 
         /// <summary>
         /// Shows the About dialog.
