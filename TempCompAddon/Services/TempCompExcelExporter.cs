@@ -58,6 +58,10 @@ namespace TempCompAddon.Services
                     // Sheet 3: Raw Data
                     CreateRawDataSheet(package, data);
 
+                    // Sheet 4: Gap Analysis
+                    if (data.GapAnalysis != null)
+                        CreateGapAnalysisSheet(package, data);
+
                     // Save file
                     package.SaveAs(new FileInfo(dlg.FileName));
                 }
@@ -164,6 +168,144 @@ namespace TempCompAddon.Services
             ws.Column(3).AutoFit();
             ws.Column(4).AutoFit();
             ws.Column(5).AutoFit();
+        }
+
+        /// <summary>
+        /// Creates the Gap Analysis worksheet with sorted TC and Body values per axis,
+        /// gap highlighting, status rows, and a line chart for each axis
+        /// showing TC vs Body measurement point distribution.
+        /// </summary>
+        private static void CreateGapAnalysisSheet(ExcelPackage package, TempCompExportData data)
+        {
+            var ws = package.Workbook.Worksheets.Add("Gap Analysis");
+            var gap = data.GapAnalysis;
+            var axes = gap.AllAxes;
+
+            // Axis names and corresponding body values
+            var bodyValueSelectors = new System.Func<RobotPose, double>[]
+            {
+        p => p.J2,
+        p => p.J3,
+        p => p.J4,
+        p => p.J5,
+        p => p.J6,
+        p => data.RobotConfiguration.CalculateJ23Angle(p)
+            };
+
+            // Chart colors: TC = blue, Body = red
+            var tcColor = Color.FromArgb(68, 114, 196);
+            var bpColor = Color.FromArgb(255, 0, 0);
+
+            int startRow = 1;
+
+            for (int axisIdx = 0; axisIdx < axes.Count; axisIdx++)
+            {
+                var axis = axes[axisIdx];
+                var bodySelector = bodyValueSelectors[axisIdx];
+
+                // ── Data table ──────────────────────────────────────
+                int dataStartRow = startRow;
+                int col = 1;
+
+                // Headers
+                ws.Cells[dataStartRow, col].Value = axis.AxisName + " TC Point";
+                ws.Cells[dataStartRow, col + 1].Value = axis.AxisName + " TC Value";
+                ws.Cells[dataStartRow, col + 2].Value = axis.AxisName + " Body Point";
+                ws.Cells[dataStartRow, col + 3].Value = axis.AxisName + " Body Value";
+
+                using (var hdr = ws.Cells[dataStartRow, col, dataStartRow, col + 3])
+                {
+                    hdr.Style.Font.Bold = true;
+                    hdr.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    hdr.Style.Fill.BackgroundColor.SetColor(Color.LightGray);
+                }
+
+                // TC data (sorted)
+                for (int i = 0; i < axis.SortedValues.Count; i++)
+                {
+                    var entry = axis.SortedValues[i];
+                    ws.Cells[dataStartRow + 1 + i, col].Value = $"{entry.PathName} - {entry.PoseName}";
+                    ws.Cells[dataStartRow + 1 + i, col + 1].Value = entry.Value;
+                    ws.Cells[dataStartRow + 1 + i, col + 1].Style.Numberformat.Format = "0.00";
+
+                    // Gap row color
+                    if (axis.GapIndices.Contains(i))
+                    {
+                        ws.Cells[dataStartRow + 1 + i, col].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[dataStartRow + 1 + i, col].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(255, 199, 206));
+                        ws.Cells[dataStartRow + 1 + i, col + 1].Style.Fill.PatternType = ExcelFillStyle.Solid;
+                        ws.Cells[dataStartRow + 1 + i, col + 1].Style.Fill.BackgroundColor.SetColor(Color.FromArgb(255, 199, 206));
+                    }
+                }
+
+                // Body data (sorted)
+                var bodyValues = new List<(double Value, string Name)>();
+                foreach (var pose in data.BodyPoses)
+                    bodyValues.Add((bodySelector(pose), pose.Name));
+                bodyValues.Sort((a, b) => a.Value.CompareTo(b.Value));
+
+                for (int i = 0; i < bodyValues.Count; i++)
+                {
+                    ws.Cells[dataStartRow + 1 + i, col + 2].Value = bodyValues[i].Name;
+                    ws.Cells[dataStartRow + 1 + i, col + 3].Value = bodyValues[i].Value;
+                    ws.Cells[dataStartRow + 1 + i, col + 3].Style.Numberformat.Format = "0.00";
+                }
+
+                int tcCount = axis.SortedValues.Count;
+                int bodyCount = bodyValues.Count;
+                int dataRows = Math.Max(tcCount, bodyCount);
+
+                // Status row
+                int statusRow = dataStartRow + 1 + dataRows;
+                ws.Cells[statusRow, col].Value = axis.Threshold > 0
+                    ? $"Threshold: {axis.Threshold:F0}°"
+                    : "No threshold";
+                ws.Cells[statusRow, col + 1].Value = axis.Threshold > 0
+                    ? (axis.IsValid ? $"OK ({axis.MaxGap:F1}°)" : $"NOK ({axis.MaxGap:F1}°)")
+                    : $"Max gap: {axis.MaxGap:F1}°";
+                ws.Cells[statusRow, col].Style.Font.Bold = true;
+                ws.Cells[statusRow, col + 1].Style.Font.Bold = true;
+
+                Color statusColor = axis.Threshold <= 0 ? Color.LightGray
+                    : axis.IsValid ? Color.FromArgb(198, 239, 206)
+                    : Color.FromArgb(255, 199, 206);
+
+                using (var sr = ws.Cells[statusRow, col, statusRow, col + 1])
+                {
+                    sr.Style.Fill.PatternType = ExcelFillStyle.Solid;
+                    sr.Style.Fill.BackgroundColor.SetColor(statusColor);
+                }
+
+                // Auto-fit data columns
+                for (int c = col; c <= col + 3; c++)
+                    ws.Column(c).AutoFit();
+
+                // ── Chart ────────────────────────────────────────────
+                var chart = ws.Drawings.AddChart(
+                    $"Chart_{axis.AxisName}",
+                    OfficeOpenXml.Drawing.Chart.eChartType.Line);
+
+                chart.Title.Text = $"{axis.AxisName} — TC vs Body";
+                chart.Title.Font.Bold = true;
+
+                // TC series
+                var tcSeries = chart.Series.Add(
+                    ws.Cells[dataStartRow + 1, col + 1, dataStartRow + tcCount, col + 1],
+                    ws.Cells[dataStartRow + 1, col + 1, dataStartRow + tcCount, col + 1]);
+                tcSeries.Header = "TC";
+
+                // Body series
+                var bodySeries = chart.Series.Add(
+                    ws.Cells[dataStartRow + 1, col + 3, dataStartRow + bodyCount, col + 3],
+                    ws.Cells[dataStartRow + 1, col + 3, dataStartRow + bodyCount, col + 3]);
+                bodySeries.Header = "Body";
+
+                // Chart position (right of data, stacked vertically)
+                chart.SetPosition(startRow - 1, 0, 5, 0);
+                chart.SetSize(600, 300);
+
+                startRow += dataRows + 6;
+            }
         }
 
         /// <summary>

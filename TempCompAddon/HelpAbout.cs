@@ -6,13 +6,10 @@ namespace TempCompAddon
 {
     public static class HelpAbout
     {
-        // ── Version info ──────────────────────────────────────────
-        public const string Version = "1.0.0";
-        public const string LastUpdated = "June 2026";
+        public const string Version = "1.2.0";
+        public const string LastUpdated = "July 2026";
         public const string Author = "ISRA Vision / CAD & Simulation";
-
-        // ── About text ────────────────────────────────────────────
-        public const string AboutText = @"Temp Comp Validator - v1.0.0
+        public const string AboutText = @"Temp Comp Validator - v1.2.0
 Process Simulate Add-On for Temp Comp Path Validation
 
 PURPOSE
@@ -42,11 +39,13 @@ differences are normalized to +/-180 deg (shortest arc):
 
 VALIDATION CRITERIA
 -------------------
-1. J2-J3 Angle Max : min 2 TC points >= body max
-2. J2-J3 Angle Min : min 2 TC points <= body min
-3. J2-3 Range      : TC range >= 75 deg
-4. J5 Symmetry     : balanced negative/positive J5 values
-5. J4 / J5 / J6 Max: TC max (abs) >= body max (abs)
+1. J2-3 Angle Coverage : min 2 TC points >= body max AND
+                         min 2 TC points <= body min
+2. J2-3 Range          : TC range >= 75 deg
+3. J5 Symmetry         : balanced negative/positive J5 values
+4. J4 Max Coverage     : min 2 TC points reach body max (abs)
+5. J5 Max Coverage     : min 2 TC points reach body max (abs)
+6. J6 Max Coverage     : min 2 TC points reach body max (abs)
 
 NEAREST TC POINT
 ----------------
@@ -69,6 +68,27 @@ TC J2-3   : only the 2 largest / 2 smallest values colored:
   - Green/Blue : covers body max/min
   - Yellow     : close but not sufficient (within threshold)
   - Red        : far from required value
+
+GAP ANALYSIS TAB
+----------------
+Shows the distribution of TC measurement point values per axis
+(J2, J3, J4, J5, J6, J2-3), sorted ascending.
+
+For each axis a user-defined max gap threshold can be set
+(default 25 deg). If the gap between two consecutive TC values
+exceeds the threshold, a red cell is inserted between them.
+
+This ensures that the TC program covers the full axis range
+with sufficient density to compensate any body measurement
+point within the given tolerance.
+
+Status row at the bottom:
+  - Green : max gap within threshold (OK)
+  - Red   : max gap exceeds threshold (NOK)
+  - Gray  : no threshold set (J2-3)
+
+Each value is shown with its source program and point name
+(e.g. UP101 - ART1_1) for traceability.
 
 MEASUREMENT POINT FILTER
 ------------------------
@@ -99,7 +119,8 @@ CUSTOM
    Enter comma-separated values in the filter fields:
    - Body prefixes  : name prefixes for body measurement points
    - TC prefixes    : name prefixes for TC measurement points
-   - OLP keywords   : fallback keywords in OLP command text"";
+   - OLP keywords   : fallback keywords in OLP command text
+
 DEVELOPED BY
 ------------
    ISRA Vision / CAD & Simulation Team

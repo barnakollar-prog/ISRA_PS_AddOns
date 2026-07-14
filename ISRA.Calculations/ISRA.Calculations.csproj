@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Accusite\CollisionCheck.cs" />
     <Compile Include="Accusite\Domain\Results\EmitterVisibilityResult.cs" />
+    <Compile Include="TempComp\Domain\Results\GapAnalysisResult.cs" />
     <Compile Include="Accusite\Domain\Results\LineOfSightResult.cs" />
     <Compile Include="Accusite\Domain\Results\StarEmitterVisibilityResult.cs" />
     <Compile Include="Accusite\Domain\Results\StarLineOfSightResult.cs" />
@@ -79,6 +80,7 @@
     <Compile Include="TempComp\RobotConfiguration\IRobotConfiguration.cs" />
     <Compile Include="TempComp\RobotConfiguration\KukaConfiguration.cs" />
     <Compile Include="TempComp\Services\DistanceCalculator.cs" />
+    <Compile Include="TempComp\Services\GapAnalysisService.cs" />
     <Compile Include="TempComp\Services\PoseReader.cs" />
     <Compile Include="TempComp\Services\PoseStatisticsCalculator.cs" />
     <Compile Include="TempComp\Services\TempCompAnalyzer.cs" />

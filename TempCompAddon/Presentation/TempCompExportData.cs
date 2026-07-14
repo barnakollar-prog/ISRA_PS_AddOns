@@ -51,6 +51,9 @@ namespace TempCompAddon.Presentation
         /// </summary>
         public PoseStatistics TempCompStatistics { get; set; }
 
+        /// <summary>Gap analysis result for TC poses.</summary>
+        public GapAnalysisResult GapAnalysis { get; set; }
+
         public TempCompExportData()
         {
             NearestTcResults = new List<NearestTcResult>();

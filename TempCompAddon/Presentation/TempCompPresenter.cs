@@ -27,6 +27,7 @@ namespace TempCompAddon.Presentation
         private PoseStatistics _lastTempCompStats;
         private IRobotConfiguration _lastRobotConfig;
         private double _lastThreshold;
+        private GapAnalysisResult _lastGapResult;
 
         public TempCompPresenter(ITempCompView view)
         {
@@ -118,6 +119,20 @@ namespace TempCompAddon.Presentation
                 var bodyStats = analyzer.CalculateStatistics(bodyPoses);
                 var tcStats = analyzer.CalculateStatistics(tempCompPoses);
 
+                // Run gap analysis
+                var gapService = new GapAnalysisService();
+                var gapResult = gapService.Analyze(
+                    tempCompPoses,
+                    robotConfig,
+                    _view.J2GapThreshold,
+                    _view.J3GapThreshold,
+                    _view.J4GapThreshold,
+                    _view.J5GapThreshold,
+                    _view.J6GapThreshold);
+
+                
+                
+
                 // Store results for export
                 _lastReport = report;
                 _lastNearestResults = nearestResults;
@@ -127,11 +142,13 @@ namespace TempCompAddon.Presentation
                 _lastTempCompStats = tcStats;
                 _lastRobotConfig = robotConfig;
                 _lastThreshold = input.MaxAngleThreshold;
+                _lastGapResult = gapResult;
 
                 // Display results through view
                 _view.DisplayValidationResults(report);
                 _view.DisplayNearestTcResults(nearestResults, input.MaxAngleThreshold, robotConfig);
                 _view.DisplayRawData(bodyPoses, tempCompPoses, robotConfig, input.MaxAngleThreshold);
+                _view.DisplayGapAnalysis(gapResult);
             }
             catch (Exception ex)
             {
@@ -179,7 +196,8 @@ namespace TempCompAddon.Presentation
                 RobotConfiguration = _lastRobotConfig,
                 MaxAngleThreshold = _lastThreshold,
                 BodyStatistics = _lastBodyStats,
-                TempCompStatistics = _lastTempCompStats
+                TempCompStatistics = _lastTempCompStats,
+                GapAnalysis = _lastGapResult
             };
         }
 
@@ -214,6 +232,13 @@ namespace TempCompAddon.Presentation
         string SelectedRobotType { get; }
         double MaxAngleThreshold { get; }
 
+        // Gap Analysis thresholds
+        double J2GapThreshold { get; }
+        double J3GapThreshold { get; }
+        double J4GapThreshold { get; }
+        double J5GapThreshold { get; }
+        double J6GapThreshold { get; }
+
         // Filter properties
         FilterMode FilterMode { get; }                  // ← ÚJ
         string[] CustomBodyPrefixes { get; }            // ← ÚJ
@@ -225,6 +250,7 @@ namespace TempCompAddon.Presentation
         void DisplayValidationResults(AnalysisReport report);
         void DisplayNearestTcResults(List<NearestTcResult> results, double threshold, IRobotConfiguration config);
         void DisplayRawData(List<RobotPose> bodyPoses, List<RobotPose> tcPoses, IRobotConfiguration config, double threshold);
+        void DisplayGapAnalysis(GapAnalysisResult result);
 
         // Export support
         bool HasResults { get; }

@@ -53,6 +53,12 @@ namespace TempCompAddon
         private Button btnRemoveBodyPaths;
         private Button btnRemoveTempCompPaths;
         private Button btnHelp;
+        private DataGridView dgvGapAnalysis;
+        private NumericUpDown nudJ2Gap;
+        private NumericUpDown nudJ3Gap;
+        private NumericUpDown nudJ4Gap;
+        private NumericUpDown nudJ5Gap;
+        private NumericUpDown nudJ6Gap;
 
         // Filter controls
         private RadioButton rbFilterNone;
@@ -507,11 +513,61 @@ namespace TempCompAddon
             lstRawData.Columns.Add("TC J6", 50);
             lstRawData.Columns.Add("TC J2-3", 60);
             tabRaw.Controls.Add(lstRawData);
+            // Tab 4: Gap Analysis
+            var tabGap = new TabPage { Text = "Gap Analysis" };
+
+            // Settings panel (top)
+            var pnlGapSettings = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 36,
+                Padding = new Padding(4)
+            };
+
+            pnlGapSettings.Controls.Add(new Label { Text = "J2 max gap (°):", Left = 8, Top = 8, Width = 100, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            nudJ2Gap = new NumericUpDown { Left = 110, Top = 6, Width = 60, Height = 24, Minimum = 1, Maximum = 180, Value = 25, DecimalPlaces = 0 };
+            pnlGapSettings.Controls.Add(nudJ2Gap);
+
+            pnlGapSettings.Controls.Add(new Label { Text = "J3 max gap (°):", Left = 182, Top = 8, Width = 100, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            nudJ3Gap = new NumericUpDown { Left = 284, Top = 6, Width = 60, Height = 24, Minimum = 1, Maximum = 180, Value = 25, DecimalPlaces = 0 };
+            pnlGapSettings.Controls.Add(nudJ3Gap);
+
+            pnlGapSettings.Controls.Add(new Label { Text = "J4 max gap (°):", Left = 356, Top = 8, Width = 100, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            nudJ4Gap = new NumericUpDown { Left = 458, Top = 6, Width = 60, Height = 24, Minimum = 1, Maximum = 180, Value = 25, DecimalPlaces = 0 };
+            pnlGapSettings.Controls.Add(nudJ4Gap);
+
+            pnlGapSettings.Controls.Add(new Label { Text = "J5 max gap (°):", Left = 530, Top = 8, Width = 100, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            nudJ5Gap = new NumericUpDown { Left = 632, Top = 6, Width = 60, Height = 24, Minimum = 1, Maximum = 180, Value = 25, DecimalPlaces = 0 };
+            pnlGapSettings.Controls.Add(nudJ5Gap);
+
+            pnlGapSettings.Controls.Add(new Label { Text = "J6 max gap (°):", Left = 704, Top = 8, Width = 100, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            nudJ6Gap = new NumericUpDown { Left = 806, Top = 6, Width = 60, Height = 24, Minimum = 1, Maximum = 180, Value = 25, DecimalPlaces = 0 };
+            pnlGapSettings.Controls.Add(nudJ6Gap);
+
+            // DataGridView
+            dgvGapAnalysis = new DataGridView
+            {
+                Dock = DockStyle.Fill,
+                AllowUserToAddRows = false,
+                AllowUserToDeleteRows = false,
+                ReadOnly = true,
+                RowHeadersVisible = false,
+                AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill,
+                Font = new Font("Consolas", 8),
+                BorderStyle = BorderStyle.None,
+                GridColor = Color.LightGray,
+                BackgroundColor = Color.White
+            };
+
+            tabGap.Controls.Add(dgvGapAnalysis);
+            tabGap.Controls.Add(pnlGapSettings);
 
             tabControl.TabPages.Add(tabValidation);
             tabControl.TabPages.Add(tabNearest);
             tabControl.TabPages.Add(tabRaw);
+            tabControl.TabPages.Add(tabGap);        // ← ÚJ
             this.Controls.Add(tabControl);
+
 
             // ── Bottom button panel (docked) ──────────────────────
             var pnlButtons = new Panel
@@ -715,7 +771,16 @@ namespace TempCompAddon
                 .Select(s => s.Trim())
                 .Where(s => !string.IsNullOrEmpty(s))
                 .ToArray();
+        public double J2GapThreshold => (double)nudJ2Gap.Value;
+        public double J3GapThreshold => (double)nudJ3Gap.Value;
+        public double J4GapThreshold => (double)nudJ4Gap.Value;
+        public double J5GapThreshold => (double)nudJ5Gap.Value;
+        public double J6GapThreshold => (double)nudJ6Gap.Value;
 
+        public void DisplayGapAnalysis(GapAnalysisResult result)
+        {
+            _formatter.FormatGapAnalysis(result, dgvGapAnalysis);
+        }
         public void DisplayValidationResults(AnalysisReport report)
         {
             _formatter.FormatValidationResults(report, lstValidation);

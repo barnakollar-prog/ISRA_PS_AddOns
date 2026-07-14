@@ -114,7 +114,122 @@ namespace TempCompAddon.Presentation
             foreach (ColumnHeader col in listView.Columns)
                 col.Width = -2;
         }
+        /// <summary>
+        /// Formats gap analysis results into a DataGridView.
+        /// </summary>
+        public void FormatGapAnalysis(GapAnalysisResult result, DataGridView grid)
+        {
+            grid.Rows.Clear();
+            grid.Columns.Clear();
 
+            if (result == null) return;
+
+            var axes = result.AllAxes;
+
+            // Add columns — Point then Value for each axis
+            foreach (var axis in axes)
+            {
+                var colPoint = new DataGridViewTextBoxColumn();
+                colPoint.HeaderText = axis.AxisName + " Point";
+                colPoint.Width = 130;
+                colPoint.SortMode = DataGridViewColumnSortMode.NotSortable;
+                grid.Columns.Add(colPoint);
+
+                var colVal = new DataGridViewTextBoxColumn();
+                colVal.HeaderText = axis.AxisName;
+                colVal.Width = 70;
+                colVal.SortMode = DataGridViewColumnSortMode.NotSortable;
+                grid.Columns.Add(colVal);
+            }
+
+            // Calculate rows per axis (values + gap cells)
+            int maxRows = 0;
+            var rowsPerAxis = new List<List<(string Label, double? Value, bool IsGap)>>();
+
+            foreach (var axis in axes)
+            {
+                var rows = new List<(string Label, double? Value, bool IsGap)>();
+                for (int i = 0; i < axis.SortedValues.Count; i++)
+                {
+                    var entry = axis.SortedValues[i];
+                    string label = $"{entry.PathName} - {entry.PoseName}";
+                    rows.Add((label, entry.Value, false));
+
+                    if (axis.GapIndices.Contains(i))
+                        rows.Add(("", null, true)); // gap cell
+                }
+                rowsPerAxis.Add(rows);
+                if (rows.Count > maxRows) maxRows = rows.Count;
+            }
+
+            // Add data rows
+            for (int r = 0; r < maxRows; r++)
+                grid.Rows.Add();
+
+            for (int axisIdx = 0; axisIdx < axes.Count; axisIdx++)
+            {
+                var rows = rowsPerAxis[axisIdx];
+                int pointCol = axisIdx * 2;
+                int valCol = axisIdx * 2 + 1;
+
+                for (int r = 0; r < rows.Count; r++)
+                {
+                    var entry = rows[r];
+                    var pointCell = grid.Rows[r].Cells[pointCol];
+                    var valCell = grid.Rows[r].Cells[valCol];
+
+                    if (entry.IsGap)
+                    {
+                        pointCell.Value = "";
+                        valCell.Value = "";
+                        pointCell.Style.BackColor = ColorPalette.NOKLight;
+                        valCell.Style.BackColor = ColorPalette.NOKLight;
+                    }
+                    else
+                    {
+                        pointCell.Value = entry.Label;
+                        valCell.Value = string.Format("{0:F2}", entry.Value);
+                    }
+                }
+            }
+
+            // Status row at bottom
+            grid.Rows.Add();
+            int statusRow = grid.Rows.Count - 1;
+            grid.Rows[statusRow].DefaultCellStyle.Font =
+                new Font(grid.Font, FontStyle.Bold);
+
+            for (int axisIdx = 0; axisIdx < axes.Count; axisIdx++)
+            {
+                var axis = axes[axisIdx];
+                int pointCol = axisIdx * 2;
+                int valCol = axisIdx * 2 + 1;
+
+                // Point col: Max gap label
+                var pointCell = grid.Rows[statusRow].Cells[pointCol];
+                pointCell.Value = axis.Threshold > 0
+                    ? $"Threshold: {axis.Threshold:F0}°"
+                    : "No threshold";
+                pointCell.Style.BackColor = Color.LightGray;
+
+                // Val col: OK/NOK
+                var valCell = grid.Rows[statusRow].Cells[valCol];
+                if (axis.Threshold <= 0)
+                {
+                    valCell.Value = $"{axis.MaxGap:F1}°";
+                    valCell.Style.BackColor = Color.LightGray;
+                }
+                else
+                {
+                    valCell.Value = axis.IsValid
+                        ? $"OK ({axis.MaxGap:F1}°)"
+                        : $"NOK ({axis.MaxGap:F1}°)";
+                    valCell.Style.BackColor = axis.IsValid
+                        ? ColorPalette.OKLight
+                        : ColorPalette.NOKLight;
+                }
+            }
+        }
         /// <summary>
         /// Formats raw pose data into a ListView with envelope highlighting.
         /// </summary>
