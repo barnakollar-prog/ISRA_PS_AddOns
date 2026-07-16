@@ -4,15 +4,21 @@ Process Simulate Add-Ons developed by ISRA Vision / CAD & Simulation Team.
 
 ## Quick Start
 
-### For End Users (No Visual Studio Required)
-Download the latest release from the [Releases page](https://github.com/barnakollar-prog/ISRA_PS_AddOns/releases/latest).
-
-1. Extract the ZIP file
-2. Run `INSTALL.bat` as Administrator
-3. Open Process Simulate — the add-ons will be available automatically
+### For End Users
+1. Copy the latest release folder from the network share:
+   `Z:\2000__Design-KnowHow-Database\9990_Programmierung\031_PS_DOT_NET_API\`
+2. Paste the contents to your PS installation:
+   `C:\Program Files\Tecnomatix_2408\eMPower\DotNetCommands\`
+3. Run `UNBLOCK.bat` to remove Windows file blocking
+4. Register the add-ons using `commandreg.exe` (first install only)
+5. Open Process Simulate — the add-ons will be available automatically
 
 ### For Developers
+See [Developer Onboarding Guide](docs/ISRA_PS_AddOns_Developer_Onboarding.docx) for full setup instructions.
+
 Clone this repository and open `ISRA_PS_AddOns.slnx` in Visual Studio.
+
+Repository: `https://dev.azure.com/ac-it-mvs/cad-simulation/_git/ISRA_PS_AddOns`
 
 ---
 
@@ -20,7 +26,7 @@ Clone this repository and open `ISRA_PS_AddOns.slnx` in Visual Studio.
 
 | Add-On | Description | Status |
 |---|---|---|
-| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export | v1.1 |
+| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export | v1.2 |
 | **LED Visibility Analyzer** | Validates AccuSite star placement vs tracker FOV with Excel export | v1.0 |
 
 ---
@@ -36,9 +42,9 @@ Validates whether a Temp Comp measurement program adequately covers the robot po
 | 1 | J2-3 Angle Coverage | At least 2 TC points must reach body max AND body min |
 | 2 | J2-3 Range | TC J2-3 range must span at least 75° |
 | 3 | J5 Symmetry | TC poses must have balanced positive and negative J5 values |
-| 4 | J4 Max Coverage | TC max J4 (abs) must cover body max J4 (abs) |
-| 5 | J5 Max Coverage | TC max J5 (abs) must cover body max J5 (abs) |
-| 6 | J6 Max Coverage | TC max J6 (abs) must cover body max J6 (abs) |
+| 4 | J4 Max Coverage | Min 2 TC points must reach body max J4 (abs) |
+| 5 | J5 Max Coverage | Min 2 TC points must reach body max J5 (abs) |
+| 6 | J6 Max Coverage | Min 2 TC points must reach body max J6 (abs) |
 
 ### Robot Types
 
@@ -69,23 +75,33 @@ Three filter modes are available:
 - TC paths: points starting with `art` or `temp`
 - OLP keywords: `meas`, `cmeas`, `inline`, `VW_USER`, `TECH10`, `PRC_IMT`
 
+### Path Selection
+
+Supports multiple operation types:
+- **WeldOperation** — added directly
+- **Compound Operation** — child WeldOperations expanded automatically
+- **Generic Robotic Operation** — child WeldOperations expanded automatically
+
 ### Result Tabs
 
 **Validation Tab** — Summary of all 6 validation criteria with Bodypart and Temp Comp values side by side.
 
-**Nearest TC Point Tab** — For each body measurement point, the nearest TC point is shown with axis differences. Color coding:
+**Nearest TC Point Tab** — For each body measurement point, the nearest TC point is shown with axis differences and source path/point name. Color coding:
 - Green: difference < threshold
 - Yellow: between threshold and 2x threshold
 - Red: above 2x threshold
 
-**Raw Data Tab** — All body and TC poses with joint values. J4/J6 displayed normalized (+/-180°).
+**Raw Data Tab** — All body and TC poses with joint values and path names. J4/J6 displayed normalized (+/-180°).
+
+**Gap Analysis Tab** — TC measurement point values sorted per axis (J2, J3, J4, J5, J6, J2-3). User-configurable gap threshold per axis (default 25°). Red cells indicate gaps exceeding the threshold. Each value shows source program and point name for traceability.
 
 ### Excel Export
 
-Exports all results to an `.xlsx` file with 3 sheets:
+Exports all results to an `.xlsx` file with 4 sheets:
 - **Validation Results** — all 6 criteria with Bodypart / Temp Comp values and status
-- **Nearest TC** — body-to-TC point mapping with color-coded differences
+- **Nearest TC** — body-to-TC point mapping with color-coded differences and path names
 - **Raw Data** — all poses with joint values and path names
+- **Gap Analysis** — sorted TC and Body values per axis with gap highlighting and line charts
 
 ---
 
@@ -117,15 +133,16 @@ ISRA_PS_AddOns/
 ## Requirements
 
 ### End Users
-- Siemens Process Simulate 2206 / 2408 / 2502
+- Siemens Process Simulate 2408
 - .NET Framework 4.8 (usually pre-installed)
-- Windows Administrator privileges (for installation only)
+- Windows Administrator privileges (for CommandReg registration only)
 
 ### Developers
 - Visual Studio 2022+
 - .NET Framework 4.8 SDK
-- Process Simulate installation for testing
+- Process Simulate 2408 installation for testing
+- Azure DevOps access (atlascopco-itba organization)
 
 ---
 
-*ISRA Vision / CAD & Simulation Team — Last updated: June 2026*
+*ISRA Vision / CAD & Simulation Team — Last updated: July 2026*

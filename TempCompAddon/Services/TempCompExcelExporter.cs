@@ -283,26 +283,30 @@ namespace TempCompAddon.Services
                 // ── Chart ────────────────────────────────────────────
                 var chart = ws.Drawings.AddChart(
                     $"Chart_{axis.AxisName}",
-                    OfficeOpenXml.Drawing.Chart.eChartType.Line);
+                    OfficeOpenXml.Drawing.Chart.eChartType.XYScatterLines);
 
                 chart.Title.Text = $"{axis.AxisName} — TC vs Body";
                 chart.Title.Font.Bold = true;
 
+                // Pozíció: egymás alatt, data oszlopok jobb oldalán
+                chart.SetPosition(startRow - 1, 0, 6, 0);
+                chart.SetSize(600, 300);
+
+                // Sorszám oszlop (X tengely)
+                for (int i = 0; i < Math.Max(tcCount, bodyCount); i++)
+                    ws.Cells[dataStartRow + 1 + i, col + 4].Value = i + 1;
+
                 // TC series
                 var tcSeries = chart.Series.Add(
-                    ws.Cells[dataStartRow + 1, col + 1, dataStartRow + tcCount, col + 1],
-                    ws.Cells[dataStartRow + 1, col + 1, dataStartRow + tcCount, col + 1]);
+    ws.Cells[dataStartRow + 1, col + 1, dataStartRow + tcCount, col + 1],
+    ws.Cells[dataStartRow + 1, col + 4, dataStartRow + tcCount, col + 4]);
                 tcSeries.Header = "TC";
 
                 // Body series
                 var bodySeries = chart.Series.Add(
-                    ws.Cells[dataStartRow + 1, col + 3, dataStartRow + bodyCount, col + 3],
-                    ws.Cells[dataStartRow + 1, col + 3, dataStartRow + bodyCount, col + 3]);
+    ws.Cells[dataStartRow + 1, col + 3, dataStartRow + bodyCount, col + 3],
+    ws.Cells[dataStartRow + 1, col + 4, dataStartRow + bodyCount, col + 4]);
                 bodySeries.Header = "Body";
-
-                // Chart position (right of data, stacked vertically)
-                chart.SetPosition(startRow - 1, 0, 5, 0);
-                chart.SetSize(600, 300);
 
                 startRow += dataRows + 6;
             }
