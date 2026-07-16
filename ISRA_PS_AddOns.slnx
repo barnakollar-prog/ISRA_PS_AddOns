@@ -1,5 +1,6 @@
 <Solution>
   <Folder Name="/docs/">
+    <File Path="docs/ISRA_PS_AddOns_Developer_Onboarding.docx" />
     <File Path="docs/README_StarVisibilityAnalyzer.md" />
     <File Path="docs/README_TempCompValidator.md" />
   </Folder>
