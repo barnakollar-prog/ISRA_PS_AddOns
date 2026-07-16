@@ -66,6 +66,36 @@ namespace TempCompAddon.Presentation
                 // Read poses using PoseReader service
                 var poseReader = new PoseReader(_view.SelectedRobot);
 
+                var allPrograms = new List<ITxObject>();
+                foreach (var program in _view.BodyPrograms)
+                {
+                    if (program != null)
+                    {
+                        allPrograms.Add(program);
+                    }
+                }
+
+                foreach (var program in _view.TempCompPrograms)
+                {
+                    if (program != null)
+                    {
+                        allPrograms.Add(program);
+                    }
+                }
+
+                var configurationSnapshot = poseReader.CreatePoseSnapshot(
+                    allPrograms,
+                    FilterMode.NoFilter,
+                    null,
+                    null);
+
+                poseReader.ReconcileLocationsWithSnapshot(
+                    allPrograms,
+                    configurationSnapshot,
+                    FilterMode.NoFilter,
+                    null,
+                    null);
+
                 var bodyPoses = poseReader.ReadPosesFromPrograms(
                     _view.BodyPrograms,
                     _view.FilterMode,

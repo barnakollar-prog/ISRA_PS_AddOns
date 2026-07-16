@@ -82,6 +82,16 @@ Supports multiple operation types:
 - **Compound Operation** — child WeldOperations expanded automatically
 - **Generic Robotic Operation** — child WeldOperations expanded automatically
 
+### Automatic Pose Recalculation (Analyze)
+
+Before reading joint values, Analyze now processes each selected location with a configuration-safe flow:
+1. Snapshot current `RobotConfigurationData`
+2. Clear `RobotConfigurationData` (`null`) to force IK recalculation from Cartesian position
+3. Read pose with `GetPoseAtLocation(...)`
+4. Restore original `RobotConfigurationData`
+
+This runs automatically for both Body and Temp Comp selected programs. The user-visible location configuration is restored after reading.
+
 ### Result Tabs
 
 **Validation Tab** — Summary of all 6 validation criteria with Bodypart and Temp Comp values side by side.
