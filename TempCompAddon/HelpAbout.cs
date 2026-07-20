@@ -121,6 +121,23 @@ CUSTOM
    - TC prefixes    : name prefixes for TC measurement points
    - OLP keywords   : fallback keywords in OLP command text
 
+KNOWN ISSUES
+------------
+ABB Robot - Missing Joint Values
+When ABB robots have inconsistent RobotConfigurationData (config flags
+do not match the stored joint values), GetPoseAtLocation() returns no
+joint values for affected locations.
+
+Workaround: Manually teach (touch up) the affected locations in PS
+before running the analysis. This updates the robot configuration and
+allows joint values to be read correctly.
+
+Root cause: PS API does not expose a programmatic way to jump the robot
+to a location and re-teach it from an add-on. The JumpToLocation method
+does not exist in Tecnomatix.Engineering.dll (2408.17). A Siemens support
+ticket has been raised to investigate a proper API solution.
+
+
 DEVELOPED BY
 ------------
    ISRA Vision / CAD & Simulation Team

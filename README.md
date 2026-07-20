@@ -130,6 +130,19 @@ ISRA_PS_AddOns/
 
 ---
 
+## Known Issues
+
+### ABB Robot — Missing Joint Values
+When ABB robots have inconsistent robot configuration data (config flags
+do not match stored joint values), the analyzer cannot read joint values
+for affected locations. These locations will be skipped in the analysis.
+
+**Workaround:** Manually teach (touch up) the affected locations in PS
+before running the analysis.
+
+**Status:** Siemens support ticket raised. Investigating programmatic solution
+via PS API.
+
 ## Requirements
 
 ### End Users
