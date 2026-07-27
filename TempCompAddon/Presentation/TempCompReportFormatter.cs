@@ -282,9 +282,9 @@ namespace TempCompAddon.Presentation
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", config.NormalizeAngle180(body.J4)) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J4) : "");
                 item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", config.NormalizeAngle180(body.J6)) : "");
+                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J6) : "");
 
                 // Body J2-3 cell with highlighting
                 if (body != null)
@@ -306,9 +306,9 @@ namespace TempCompAddon.Presentation
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", config.NormalizeAngle180(tc.J4)) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J4) : "");
                 item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", config.NormalizeAngle180(tc.J6)) : "");
+                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J6) : "");
 
                 // TC J2-3 cell with coverage highlighting
                 if (tc != null)

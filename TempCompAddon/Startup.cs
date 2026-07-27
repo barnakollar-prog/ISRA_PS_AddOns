@@ -80,6 +80,8 @@ namespace TempCompAddon
         private ListView lstValidation;
         private ListView lstNearestTc;
         private ListView lstRawData;
+        private int _rawDataSortColumn = -1;
+        private SortOrder _rawDataSortOrder = SortOrder.Ascending;
 
         private readonly List<TxWeldOperation> _bodyPrograms
             = new List<TxWeldOperation>();
@@ -427,6 +429,7 @@ namespace TempCompAddon
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             btnAnalyze.Click += OnAnalyze;
+           
             this.Controls.Add(btnAnalyze);
             y += 44;
 
@@ -460,7 +463,7 @@ namespace TempCompAddon
 
             // Tab 2: Nearest TC
             // Tab 2: Nearest TC
-            var tabNearest = new TabPage { Text = "Nearest TC Point" };
+            var tabNearest = new TabPage { Text = "Nearest TC Point (Experimental)" };
             lstNearestTc = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -482,6 +485,20 @@ namespace TempCompAddon
             lstNearestTc.Columns.Add("TC J5", 60);
             lstNearestTc.Columns.Add("TC J6", 60);
             lstNearestTc.Columns.Add("Max Diff", 60);
+            var pnlNearestInfo = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 30,
+                BackColor = Color.FromArgb(255, 235, 156) // sárga
+            };
+            pnlNearestInfo.Controls.Add(new Label
+            {
+                Dock = DockStyle.Fill,
+                TextAlign = ContentAlignment.MiddleLeft,
+                Font = new Font("Segoe UI", 8, FontStyle.Italic),
+                Padding = new Padding(6, 0, 0, 0)
+            });
+            tabNearest.Controls.Add(pnlNearestInfo);
             tabNearest.Controls.Add(lstNearestTc);
 
             // Tab 3: Raw Data
@@ -494,6 +511,7 @@ namespace TempCompAddon
                 GridLines = true,
                 Font = new Font("Consolas", 8)
             };
+            lstRawData.ColumnClick += OnRawDataColumnClick;
             lstRawData.Columns.Add("Body Point", 110);
             lstRawData.Columns.Add("Body Path", 120);
             lstRawData.Columns.Add("J1", 50);
@@ -839,6 +857,60 @@ namespace TempCompAddon
                 rbFanuc.Checked = true;
             else if (detected == TempCompCalculations.RobotType.Abb)
                 rbAbb.Checked = true;
+        }
+        //
+        private void OnRawDataColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            if (_rawDataSortColumn == e.Column)
+            {
+                _rawDataSortOrder = _rawDataSortOrder == SortOrder.Ascending
+                    ? SortOrder.Descending
+                    : SortOrder.Ascending;
+            }
+            else
+            {
+                _rawDataSortColumn = e.Column;
+                _rawDataSortOrder = SortOrder.Ascending;
+            }
+
+            lstRawData.ListViewItemSorter = new ListViewItemComparer(e.Column, _rawDataSortOrder);
+            lstRawData.Sort();
+        }//
+        private class ListViewItemComparer : System.Collections.IComparer
+        {
+            private readonly int _col;
+            private readonly SortOrder _order;
+
+            public ListViewItemComparer(int col, SortOrder order)
+            {
+                _col = col;
+                _order = order;
+            }
+
+            public int Compare(object x, object y)
+            {
+                var lx = (ListViewItem)x;
+                var ly = (ListViewItem)y;
+
+                string sx = _col < lx.SubItems.Count ? lx.SubItems[_col].Text : "";
+                string sy = _col < ly.SubItems.Count ? ly.SubItems[_col].Text : "";
+
+                // Numeric comparison if both parseable
+                if (double.TryParse(sx.Replace(",", "."),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out double dx) &&
+                    double.TryParse(sy.Replace(",", "."),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out double dy))
+                {
+                    int result = dx.CompareTo(dy);
+                    return _order == SortOrder.Ascending ? result : -result;
+                }
+
+                // String comparison fallback
+                int strResult = string.Compare(sx, sy, StringComparison.OrdinalIgnoreCase);
+                return _order == SortOrder.Ascending ? strResult : -strResult;
+            }
         }
 
         private TempCompCalculations.RobotType? DetectRobotTypeFromPath(string path)

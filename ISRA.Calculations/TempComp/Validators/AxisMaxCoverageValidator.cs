@@ -40,62 +40,49 @@ namespace ISRA.Calculations.TempComp.Validators
 
             var config = input.RobotConfiguration;
 
-            // Find body max (for comparison: absolute/normalized; for display: actual value)
-            double bodyMaxAbs = double.MinValue;
-            double bodyMaxDisplay = double.MinValue;  // ← visszakerül J4/J6-hoz
+            // Find body max (positive) and min (negative)
             double bodyMaxPositive = double.MinValue;
             double bodyMinNegative = double.MaxValue;
             foreach (var pose in input.BodyPoses)
             {
                 double value = _selector(pose);
-                if (_axisName == "J4" || _axisName == "J6")
-                    value = config.NormalizeAngle180(value);
-                double absValue = _useAbsoluteValue ? Math.Abs(value) : value;
-                if (absValue > bodyMaxAbs)
-                {
-                    bodyMaxAbs = absValue;
-                    bodyMaxDisplay = value;  // ← J4/J6-hoz
-                }
-                if (_axisName == "J5" && value > bodyMaxPositive) bodyMaxPositive = value;
-                if (_axisName == "J5" && value < bodyMinNegative) bodyMinNegative = value;
+                if (value > bodyMaxPositive) bodyMaxPositive = value;
+                if (value < bodyMinNegative) bodyMinNegative = value;
             }
 
-            // Find TC max and check if it covers body max
-            double tcMaxAbs = double.MinValue;
-            double tcMaxDisplay = double.MinValue;    // ← visszakerül J4/J6-hoz
+            // Count TC points covering positive max and negative min
+            int countPositive = 0;
+            int countNegative = 0;
             double tcMaxPositive = double.MinValue;
             double tcMinNegative = double.MaxValue;
-            int coveringCount = 0;
             foreach (var pose in input.TempCompPoses)
             {
                 double value = _selector(pose);
-                if (_axisName == "J4" || _axisName == "J6")
-                    value = config.NormalizeAngle180(value);
-                double absValue = _useAbsoluteValue ? Math.Abs(value) : value;
-                if (absValue > tcMaxAbs)
-                {
-                    tcMaxAbs = absValue;
-                    tcMaxDisplay = value;  // ← J4/J6-hoz
-                }
-                if (_axisName == "J5" && value > tcMaxPositive) tcMaxPositive = value;
-                if (_axisName == "J5" && value < tcMinNegative) tcMinNegative = value;
-                if (absValue >= bodyMaxAbs) coveringCount++;
+                if (value > tcMaxPositive) tcMaxPositive = value;
+                if (value < tcMinNegative) tcMinNegative = value;
+                if (value >= bodyMaxPositive) countPositive++;
+                if (value <= bodyMinNegative) countNegative++;
             }
 
-            // Build display strings
-            string bodypartStr = _axisName == "J5"
-                ? $"Body max: +{bodyMaxPositive:F1}° / {bodyMinNegative:F1}°"
-                : $"Body max: {bodyMaxDisplay:F1}°";
+            bool coveredPositive = countPositive >= 2;
+            bool coveredNegative = countNegative >= 2;
+            bool covered = coveredPositive && coveredNegative;
 
-            string tempCompStr = _axisName == "J5"
-                ? $"TC max: +{tcMaxPositive:F1}° / {tcMinNegative:F1}°"
-                : $"TC max: {tcMaxDisplay:F1}°";
-            bool covered = coveringCount >= 2;
+            string posStr = coveredPositive
+                ? $"Pos: {countPositive} pts OK"
+                : $"Pos: {countPositive} pt(s) NOK";
+            string negStr = coveredNegative
+                ? $"Neg: {countNegative} pts OK"
+                : $"Neg: {countNegative} pt(s) NOK";
+
+            string details = $"{posStr}, {negStr}";
+
+            string bodypartStr = $"Body max: +{bodyMaxPositive:F1}° / {bodyMinNegative:F1}°";
+            string tempCompStr = $"TC max: +{tcMaxPositive:F1}° / {tcMinNegative:F1}°";
+
             return CreateResult(
                 Name, covered,
-                covered
-                    ? $"TC covers body maximum ({coveringCount} points)"
-                    : $"TC coverage insufficient: {coveringCount} point(s) reach body max (need ≥2)",
+                details,
                 "",
                 bodypartStr,
                 tempCompStr);

@@ -31,11 +31,13 @@ Robot type is auto-detected from the robot 3D file path
 
 AXIS NORMALIZATION (J4 / J6)
 ----------------------------
-J4 and J6 can rotate 360 deg - the same physical position is
-reachable with different axis values. All J4/J6 values and
-differences are normalized to +/-180 deg (shortest arc):
+J4 and J6 differences in the Nearest TC Point tab are normalized
+to +/-180 deg (shortest arc) for distance calculation purposes:
 
   dA = ((d + 180) mod 360) - 180
+
+Note: Raw Data tab and Validation tab show original (non-normalized)
+J4/J6 values as read from the robot program.
 
 VALIDATION CRITERIA
 -------------------
@@ -43,9 +45,10 @@ VALIDATION CRITERIA
                          min 2 TC points <= body min
 2. J2-3 Range          : TC range >= 75 deg
 3. J5 Symmetry         : balanced negative/positive J5 values
-4. J4 Max Coverage     : min 2 TC points reach body max (abs)
-5. J5 Max Coverage     : min 2 TC points reach body max (abs)
-6. J6 Max Coverage     : min 2 TC points reach body max (abs)
+4. J4 Max Coverage     : min 2 TC points >= body positive max
+                         AND min 2 TC points <= body negative min
+5. J5 Max Coverage     : same as J4
+6. J6 Max Coverage     : same as J4
 
 NEAREST TC POINT
 ----------------
@@ -62,12 +65,16 @@ Max Diff column = largest single axis difference.
 
 RAW DATA TAB
 ------------
-J4/J6 values displayed normalized (+/-180 deg).
+J4/J6 values displayed as raw (non-normalized) values.
 Body J2-3 : max = green, min = light blue
 TC J2-3   : only the 2 largest / 2 smallest values colored:
   - Green/Blue : covers body max/min
   - Yellow     : close but not sufficient (within threshold)
   - Red        : far from required value
+
+Columns can be sorted by clicking the column header.
+Click again to reverse the sort order.
+Numeric columns are sorted numerically.
 
 GAP ANALYSIS TAB
 ----------------

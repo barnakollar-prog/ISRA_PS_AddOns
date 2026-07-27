@@ -14,7 +14,7 @@ Process Simulate Add-Ons developed by ISRA Vision / CAD & Simulation Team.
 5. Open Process Simulate — the add-ons will be available automatically
 
 ### For Developers
-See [Developer Onboarding Guide](docs/ISRA_PS_AddOns_Developer_Onboarding.docx) for full setup instructions.
+See [Developer Onboarding Guide](https://dev.azure.com/ac-it-mvs/cad-simulation/_wiki/wikis/cad-simulation.wiki/ISRA_CAD_AddOns_Developer_Onboarding) for full setup instructions.
 
 Clone this repository and open `ISRA_PS_AddOns.slnx` in Visual Studio.
 
@@ -26,7 +26,7 @@ Repository: `https://dev.azure.com/ac-it-mvs/cad-simulation/_git/ISRA_PS_AddOns`
 
 | Add-On | Description | Status |
 |---|---|---|
-| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export | v1.2 |
+| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export | v1.3 |
 | **LED Visibility Analyzer** | Validates AccuSite star placement vs tracker FOV with Excel export | v1.0 |
 
 ---
@@ -42,9 +42,9 @@ Validates whether a Temp Comp measurement program adequately covers the robot po
 | 1 | J2-3 Angle Coverage | At least 2 TC points must reach body max AND body min |
 | 2 | J2-3 Range | TC J2-3 range must span at least 75° |
 | 3 | J5 Symmetry | TC poses must have balanced positive and negative J5 values |
-| 4 | J4 Max Coverage | Min 2 TC points must reach body max J4 (abs) |
-| 5 | J5 Max Coverage | Min 2 TC points must reach body max J5 (abs) |
-| 6 | J6 Max Coverage | Min 2 TC points must reach body max J6 (abs) |
+| 4 | J4 Max Coverage | Min 2 TC points >= body positive max AND min 2 TC points <= body negative min |
+| 5 | J5 Max Coverage | Min 2 TC points >= body positive max AND min 2 TC points <= body negative min |
+| 6 | J6 Max Coverage | Min 2 TC points >= body positive max AND min 2 TC points <= body negative min |
 
 ### Robot Types
 
@@ -56,9 +56,11 @@ Robot type is auto-detected from the robot 3D file path and can be overridden ma
 | Kuka | (-1) * J3 + 180 |
 | ABB | (-1) * J3 + 90 |
 
-### Axis Normalization
+### Axis Values
 
-J4 and J6 can rotate 360° — the same physical position is reachable with different axis values. All J4/J6 values and differences are normalized to +/-180° (shortest arc).
+J4/J6 values are displayed and evaluated as raw (non-normalized) values in the Validation tab, Raw Data tab, and Gap Analysis tab.
+
+J4/J6 **differences** in the Nearest TC Point tab are normalized to +/-180° (shortest arc) for distance calculation purposes only.
 
 ### Measurement Point Filter
 
@@ -84,14 +86,14 @@ Supports multiple operation types:
 
 ### Result Tabs
 
-**Validation Tab** — Summary of all 6 validation criteria with Bodypart and Temp Comp values side by side.
+**Validation Tab** — Summary of all 6 validation criteria with Bodypart and Temp Comp values side by side. J4/J5/J6 show positive and negative peak values (+X° / -Y°) and coverage counts per direction.
 
-**Nearest TC Point Tab** — For each body measurement point, the nearest TC point is shown with axis differences and source path/point name. Color coding:
+**Nearest TC Point Tab** *(Experimental)* — For each body measurement point, the nearest TC point is shown with axis differences and source path/point name. Color coding:
 - Green: difference < threshold
 - Yellow: between threshold and 2x threshold
 - Red: above 2x threshold
 
-**Raw Data Tab** — All body and TC poses with joint values and path names. J4/J6 displayed normalized (+/-180°).
+**Raw Data Tab** — All body and TC poses with joint values and path names. J4/J6 displayed as raw (non-normalized) values. Columns can be sorted by clicking the header.
 
 **Gap Analysis Tab** — TC measurement point values sorted per axis (J2, J3, J4, J5, J6, J2-3). User-configurable gap threshold per axis (default 25°). Red cells indicate gaps exceeding the threshold. Each value shows source program and point name for traceability.
 
@@ -100,7 +102,7 @@ Supports multiple operation types:
 Exports all results to an `.xlsx` file with 4 sheets:
 - **Validation Results** — all 6 criteria with Bodypart / Temp Comp values and status
 - **Nearest TC** — body-to-TC point mapping with color-coded differences and path names
-- **Raw Data** — all poses with joint values and path names
+- **Raw Data** — all poses with raw joint values and path names
 - **Gap Analysis** — sorted TC and Body values per axis with gap highlighting and line charts
 
 ---
@@ -142,6 +144,8 @@ before running the analysis.
 
 **Status:** Siemens support ticket raised. Investigating programmatic solution
 via PS API.
+
+---
 
 ## Requirements
 
