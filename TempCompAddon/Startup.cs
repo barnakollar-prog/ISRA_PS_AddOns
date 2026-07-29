@@ -628,40 +628,76 @@ namespace TempCompAddon
             var pnlButtons = new Panel
             {
                 Dock = DockStyle.Bottom,
-                Height = 72,
+                Height = 108,
                 Padding = new Padding(lx, 4, lx, 4)
             };
+
+            var buttonsLayout = new TableLayoutPanel
+            {
+                Dock = DockStyle.Fill,
+                ColumnCount = 1,
+                RowCount = 3,
+                Margin = new Padding(0),
+                Padding = new Padding(0)
+            };
+            buttonsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            buttonsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 32f));
+            buttonsLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 28f));
 
             btnExport = new Button
             {
                 Text = "Export to Excel",
-                Dock = DockStyle.Top,
+                Dock = DockStyle.Fill,
                 Height = 32,
+                Margin = new Padding(0),
                 BackColor = Color.FromArgb(0, 120, 0),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9, FontStyle.Bold)
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
             };
             btnExport.Click += OnExport;
+
+            var btnEvaluate = new Button
+            {
+                Text = "AI Evaluation",
+                Dock = DockStyle.Fill,
+                Height = 32,
+                Margin = new Padding(0, 4, 0, 0),
+                BackColor = Color.FromArgb(0, 84, 166),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9, FontStyle.Bold),
+                TextAlign = ContentAlignment.MiddleCenter
+            };
+            btnEvaluate.Click += OnEvaluate;
 
             btnHelp = new Button
             {
                 Text = "Help / About",
-                Dock = DockStyle.Bottom,
+                Dock = DockStyle.Fill,
                 Height = 28,
+                Margin = new Padding(0, 4, 0, 0),
                 BackColor = Color.FromArgb(60, 60, 60),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
-                Font = new Font("Segoe UI", 9)
+                Font = new Font("Segoe UI", 9),
+                TextAlign = ContentAlignment.MiddleCenter
             };
             btnHelp.Click += (s, e) => HelpAbout.ShowAbout();
 
-            pnlButtons.Controls.Add(btnExport);
-            pnlButtons.Controls.Add(btnHelp);
+            buttonsLayout.Controls.Add(btnExport, 0, 0);
+            buttonsLayout.Controls.Add(btnEvaluate, 0, 1);
+            buttonsLayout.Controls.Add(btnHelp, 0, 2);
+            pnlButtons.Controls.Add(buttonsLayout);
             this.Controls.Add(pnlButtons);
 
             // ── Adjust TabControl height to end above the button panel ──
             tabControl.Height = this.ClientSize.Height - tabControl.Top - pnlButtons.Height - 8;
+        }
+        private void OnEvaluate(object sender, EventArgs e)
+        {
+            _presenter.Evaluate();
         }
 
         // ── Pick from PS ──────────────────────────────────────────
@@ -864,6 +900,12 @@ namespace TempCompAddon
         public void ShowExportDialog(TempCompExportData data)
         {
             TempCompAddon.Services.TempCompExcelExporter.Export(data);
+        }
+
+        public void ShowEvaluationResult(EvaluationResult result)
+        {
+            var dialog = new EvaluationResultDialog(result);
+            dialog.ShowDialog();
         }
 
         // ── Helpers ───────────────────────────────────────────────

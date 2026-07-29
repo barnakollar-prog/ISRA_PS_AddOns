@@ -181,6 +181,24 @@ namespace TempCompAddon.Presentation
                 _view.ShowError($"Export preparation failed: {ex.Message}", "Export Error");
             }
         }
+        public void Evaluate()
+        {
+            if (_lastReport == null || _lastGapResult == null)
+            {
+                _view.ShowError("Please run the analysis first.", "No Data");
+                return;
+            }
+
+            var service = new TempCompEvaluationService();
+            var result = service.Evaluate(
+                _lastReport,
+                _lastGapResult,
+                _lastBodyPoses,
+                _lastTempCompPoses,
+                _lastRobotConfig);
+
+            _view.ShowEvaluationResult(result);
+        }
 
         /// <summary>
         /// Prepares export data from the last analysis results.
@@ -255,6 +273,8 @@ namespace TempCompAddon.Presentation
         // Export support
         bool HasResults { get; }
         void ShowExportDialog(TempCompExportData data);
+
+        void ShowEvaluationResult(EvaluationResult result);
 
         // Error handling
         void ShowError(string message, string title);

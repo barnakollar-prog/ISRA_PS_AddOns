@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Accusite\CollisionCheck.cs" />
     <Compile Include="Accusite\Domain\Results\EmitterVisibilityResult.cs" />
+    <Compile Include="TempComp\Domain\Results\EvaluationResult.cs" />
     <Compile Include="TempComp\Domain\Results\GapAnalysisResult.cs" />
     <Compile Include="Accusite\Domain\Results\LineOfSightResult.cs" />
     <Compile Include="Accusite\Domain\Results\StarEmitterVisibilityResult.cs" />
@@ -84,6 +85,7 @@
     <Compile Include="TempComp\Services\PoseReader.cs" />
     <Compile Include="TempComp\Services\PoseStatisticsCalculator.cs" />
     <Compile Include="TempComp\Services\TempCompAnalyzer.cs" />
+    <Compile Include="TempComp\Services\TempCompEvaluationService.cs" />
     <Compile Include="TempComp\TempCompCalculations.cs" />
     <Compile Include="TempComp\Validators\AxisMaxCoverageValidator.cs" />
     <Compile Include="TempComp\Validators\FilterMode.cs" />

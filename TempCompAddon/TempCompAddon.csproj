@@ -58,6 +58,9 @@
     </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="EvaluationResultDialog.cs">
+      <SubType>Form</SubType>
+    </Compile>
     <Compile Include="HelpAbout.cs" />
     <Compile Include="Presentation\TempCompExportData.cs" />
     <Compile Include="Presentation\TempCompPresenter.cs" />
