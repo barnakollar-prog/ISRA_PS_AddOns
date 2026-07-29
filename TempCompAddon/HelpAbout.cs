@@ -6,10 +6,10 @@ namespace TempCompAddon
 {
     public static class HelpAbout
     {
-        public const string Version = "1.2.0";
+        public const string Version = "1.3.0";
         public const string LastUpdated = "July 2026";
         public const string Author = "ISRA Vision / CAD & Simulation";
-        public const string AboutText = @"Temp Comp Validator - v1.2.0
+        public const string AboutText = @"Temp Comp Validator - v1.3.0
 Process Simulate Add-On for Temp Comp Path Validation
 
 PURPOSE
@@ -65,6 +65,10 @@ Max Diff column = largest single axis difference.
 
 RAW DATA TAB
 ------------
+Raw Data is shown in two independent tables:
+  - Bodypart
+  - Temp Comp
+
 J4/J6 values displayed as raw (non-normalized) values.
 Body J2-3 : max = green, min = light blue
 TC J2-3   : only the 2 largest / 2 smallest values colored:
@@ -72,9 +76,10 @@ TC J2-3   : only the 2 largest / 2 smallest values colored:
   - Yellow     : close but not sufficient (within threshold)
   - Red        : far from required value
 
-Columns can be sorted by clicking the column header.
+Columns can be sorted by clicking the column header in each table.
 Click again to reverse the sort order.
 Numeric columns are sorted numerically.
+Bodypart and Temp Comp sorting are independent.
 
 GAP ANALYSIS TAB
 ----------------

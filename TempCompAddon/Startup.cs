@@ -79,9 +79,12 @@ namespace TempCompAddon
         // Tab results
         private ListView lstValidation;
         private ListView lstNearestTc;
-        private ListView lstRawData;
-        private int _rawDataSortColumn = -1;
-        private SortOrder _rawDataSortOrder = SortOrder.Ascending;
+        private ListView lstRawBody;
+        private ListView lstRawTc;
+        private int _rawBodySortColumn = -1;
+        private SortOrder _rawBodySortOrder = SortOrder.Ascending;
+        private int _rawTcSortColumn = -1;
+        private SortOrder _rawTcSortOrder = SortOrder.Ascending;
 
         private readonly List<TxWeldOperation> _bodyPrograms
             = new List<TxWeldOperation>();
@@ -503,7 +506,20 @@ namespace TempCompAddon
 
             // Tab 3: Raw Data
             var tabRaw = new TabPage { Text = "Raw Data" };
-            lstRawData = new ListView
+            var rawSplit = new SplitContainer
+            {
+                Dock = DockStyle.Fill,
+                Orientation = Orientation.Vertical,
+                SplitterDistance = 380
+            };
+
+            var grpRawBody = new GroupBox
+            {
+                Text = "Bodypart",
+                Dock = DockStyle.Fill
+            };
+
+            lstRawBody = new ListView
             {
                 Dock = DockStyle.Fill,
                 View = View.Details,
@@ -511,26 +527,47 @@ namespace TempCompAddon
                 GridLines = true,
                 Font = new Font("Consolas", 8)
             };
-            lstRawData.ColumnClick += OnRawDataColumnClick;
-            lstRawData.Columns.Add("Body Point", 110);
-            lstRawData.Columns.Add("Body Path", 120);
-            lstRawData.Columns.Add("J1", 50);
-            lstRawData.Columns.Add("J2", 50);
-            lstRawData.Columns.Add("J3", 50);
-            lstRawData.Columns.Add("J4", 50);
-            lstRawData.Columns.Add("J5", 50);
-            lstRawData.Columns.Add("J6", 50);
-            lstRawData.Columns.Add("J2-3", 60);
-            lstRawData.Columns.Add("TC Point", 110);
-            lstRawData.Columns.Add("TC Path", 120);
-            lstRawData.Columns.Add("TC J1", 50);
-            lstRawData.Columns.Add("TC J2", 50);
-            lstRawData.Columns.Add("TC J3", 50);
-            lstRawData.Columns.Add("TC J4", 50);
-            lstRawData.Columns.Add("TC J5", 50);
-            lstRawData.Columns.Add("TC J6", 50);
-            lstRawData.Columns.Add("TC J2-3", 60);
-            tabRaw.Controls.Add(lstRawData);
+            lstRawBody.ColumnClick += OnRawBodyColumnClick;
+            lstRawBody.Columns.Add("Body Point", 110);
+            lstRawBody.Columns.Add("Body Path", 120);
+            lstRawBody.Columns.Add("J1", 50);
+            lstRawBody.Columns.Add("J2", 50);
+            lstRawBody.Columns.Add("J3", 50);
+            lstRawBody.Columns.Add("J4", 50);
+            lstRawBody.Columns.Add("J5", 50);
+            lstRawBody.Columns.Add("J6", 50);
+            lstRawBody.Columns.Add("J2-3", 60);
+            grpRawBody.Controls.Add(lstRawBody);
+
+            var grpRawTc = new GroupBox
+            {
+                Text = "Temp Comp",
+                Dock = DockStyle.Fill
+            };
+
+            lstRawTc = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Font = new Font("Consolas", 8)
+            };
+            lstRawTc.ColumnClick += OnRawTcColumnClick;
+            lstRawTc.Columns.Add("TC Point", 110);
+            lstRawTc.Columns.Add("TC Path", 120);
+            lstRawTc.Columns.Add("TC J1", 50);
+            lstRawTc.Columns.Add("TC J2", 50);
+            lstRawTc.Columns.Add("TC J3", 50);
+            lstRawTc.Columns.Add("TC J4", 50);
+            lstRawTc.Columns.Add("TC J5", 50);
+            lstRawTc.Columns.Add("TC J6", 50);
+            lstRawTc.Columns.Add("TC J2-3", 60);
+            grpRawTc.Controls.Add(lstRawTc);
+
+            rawSplit.Panel1.Controls.Add(grpRawBody);
+            rawSplit.Panel2.Controls.Add(grpRawTc);
+            tabRaw.Controls.Add(rawSplit);
             // Tab 4: Gap Analysis
             var tabGap = new TabPage { Text = "Gap Analysis" };
 
@@ -811,7 +848,7 @@ namespace TempCompAddon
 
         public void DisplayRawData(List<RobotPose> bodyPoses, List<RobotPose> tcPoses, IRobotConfiguration config, double threshold)
         {
-            _formatter.FormatRawData(bodyPoses, tcPoses, lstRawData, config, threshold);
+            _formatter.FormatRawData(bodyPoses, tcPoses, lstRawBody, lstRawTc, config, threshold);
         }
 
         public void ShowError(string message, string title)
@@ -821,7 +858,8 @@ namespace TempCompAddon
 
         public bool HasResults => lstValidation.Items.Count > 0 ||
                                    lstNearestTc.Items.Count > 0 ||
-                                   lstRawData.Items.Count > 0;
+                                   lstRawBody.Items.Count > 0 ||
+                                   lstRawTc.Items.Count > 0;
 
         public void ShowExportDialog(TempCompExportData data)
         {
@@ -859,22 +897,40 @@ namespace TempCompAddon
                 rbAbb.Checked = true;
         }
         //
-        private void OnRawDataColumnClick(object sender, ColumnClickEventArgs e)
+        private void OnRawBodyColumnClick(object sender, ColumnClickEventArgs e)
         {
-            if (_rawDataSortColumn == e.Column)
+            if (_rawBodySortColumn == e.Column)
             {
-                _rawDataSortOrder = _rawDataSortOrder == SortOrder.Ascending
+                _rawBodySortOrder = _rawBodySortOrder == SortOrder.Ascending
                     ? SortOrder.Descending
                     : SortOrder.Ascending;
             }
             else
             {
-                _rawDataSortColumn = e.Column;
-                _rawDataSortOrder = SortOrder.Ascending;
+                _rawBodySortColumn = e.Column;
+                _rawBodySortOrder = SortOrder.Ascending;
             }
 
-            lstRawData.ListViewItemSorter = new ListViewItemComparer(e.Column, _rawDataSortOrder);
-            lstRawData.Sort();
+            lstRawBody.ListViewItemSorter = new ListViewItemComparer(e.Column, _rawBodySortOrder);
+            lstRawBody.Sort();
+        }
+
+        private void OnRawTcColumnClick(object sender, ColumnClickEventArgs e)
+        {
+            if (_rawTcSortColumn == e.Column)
+            {
+                _rawTcSortOrder = _rawTcSortOrder == SortOrder.Ascending
+                    ? SortOrder.Descending
+                    : SortOrder.Ascending;
+            }
+            else
+            {
+                _rawTcSortColumn = e.Column;
+                _rawTcSortOrder = SortOrder.Ascending;
+            }
+
+            lstRawTc.ListViewItemSorter = new ListViewItemComparer(e.Column, _rawTcSortOrder);
+            lstRawTc.Sort();
         }//
         private class ListViewItemComparer : System.Collections.IComparer
         {

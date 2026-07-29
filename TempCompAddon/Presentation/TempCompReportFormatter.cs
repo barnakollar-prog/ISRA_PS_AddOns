@@ -236,16 +236,17 @@ namespace TempCompAddon.Presentation
         public void FormatRawData(
             List<RobotPose> bodyPoses,
             List<RobotPose> tcPoses,
-            ListView listView,
+            ListView bodyListView,
+            ListView tcListView,
             IRobotConfiguration config,
             double threshold)
         {
-            listView.Items.Clear();
+            bodyListView.Items.Clear();
+            tcListView.Items.Clear();
 
             if (bodyPoses == null || tcPoses == null)
                 return;
 
-            // Calculate body J2-3 envelope
             double bodyMax23 = double.MinValue, bodyMin23 = double.MaxValue;
             foreach (var b in bodyPoses)
             {
@@ -254,7 +255,6 @@ namespace TempCompAddon.Presentation
                 if (a < bodyMin23) bodyMin23 = a;
             }
 
-            // Find TC J2-3: 2 largest and 2 smallest values
             double tcMax1 = double.MinValue, tcMax2 = double.MinValue;
             double tcMin1 = double.MaxValue, tcMin2 = double.MaxValue;
             foreach (var t in tcPoses)
@@ -266,82 +266,69 @@ namespace TempCompAddon.Presentation
                 else if (a < tcMin2) tcMin2 = a;
             }
 
-            int maxRows = Math.Max(bodyPoses.Count, tcPoses.Count);
-            for (int i = 0; i < maxRows; i++)
+            foreach (var body in bodyPoses)
             {
-                var body = i < bodyPoses.Count ? bodyPoses[i] : null;
-                var tc = i < tcPoses.Count ? tcPoses[i] : null;
-
-                var item = new ListViewItem(body != null ? body.Name : "");
+                var item = new ListViewItem(body.Name ?? "");
                 item.UseItemStyleForSubItems = false;
+                item.SubItems.Add(body.PathName ?? "");
+                item.SubItems.Add(string.Format("{0:F2}", body.J1));
+                item.SubItems.Add(string.Format("{0:F2}", body.J2));
+                item.SubItems.Add(string.Format("{0:F2}", body.J3));
+                item.SubItems.Add(string.Format("{0:F2}", body.J4));
+                item.SubItems.Add(string.Format("{0:F2}", body.J5));
+                item.SubItems.Add(string.Format("{0:F2}", body.J6));
 
-                // Body Path column
-                item.SubItems.Add(body != null ? body.PathName ?? "" : "");
+                double bodyA = config.CalculateJ23Angle(body);
+                var sub = item.SubItems.Add(string.Format("{0:F2}", bodyA));
+                if (bodyA == bodyMax23)
+                    sub.BackColor = ColorPalette.OKLight;
+                else if (bodyA == bodyMin23)
+                    sub.BackColor = ColorPalette.Info;
 
-                // Body columns
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J1) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J2) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J3) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J4) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J5) : "");
-                item.SubItems.Add(body != null ? string.Format("{0:F2}", body.J6) : "");
-
-                // Body J2-3 cell with highlighting
-                if (body != null)
-                {
-                    double bodyA = config.CalculateJ23Angle(body);
-                    var sub = item.SubItems.Add(string.Format("{0:F2}", bodyA));
-                    if (bodyA == bodyMax23)
-                        sub.BackColor = ColorPalette.OKLight;
-                    else if (bodyA == bodyMin23)
-                        sub.BackColor = ColorPalette.Info;
-                }
-                else item.SubItems.Add("");
-
-                // TC columns
-                item.SubItems.Add(tc != null ? tc.Name : "");
-
-                // TC Path column
-                item.SubItems.Add(tc != null ? tc.PathName ?? "" : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J1) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J2) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J3) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J4) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J5) : "");
-                item.SubItems.Add(tc != null ? string.Format("{0:F2}", tc.J6) : "");
-
-                // TC J2-3 cell with coverage highlighting
-                if (tc != null)
-                {
-                    double tcA = config.CalculateJ23Angle(tc);
-                    var sub = item.SubItems.Add(string.Format("{0:F2}", tcA));
-
-                    if (tcA >= tcMax2) // Top 2 largest
-                    {
-                        if (tcA >= bodyMax23)
-                            sub.BackColor = ColorPalette.OKLight;
-                        else if (bodyMax23 - tcA < threshold)
-                            sub.BackColor = ColorPalette.WarningLight;
-                        else
-                            sub.BackColor = ColorPalette.NOKLight;
-                    }
-                    else if (tcA <= tcMin2) // Bottom 2 smallest
-                    {
-                        if (tcA <= bodyMin23)
-                            sub.BackColor = ColorPalette.Info;
-                        else if (tcA - bodyMin23 < threshold)
-                            sub.BackColor = ColorPalette.WarningLight;
-                        else
-                            sub.BackColor = ColorPalette.NOKLight;
-                    }
-                }
-                else item.SubItems.Add("");
-
-                listView.Items.Add(item);
+                bodyListView.Items.Add(item);
             }
 
-            // Auto-resize columns
-            foreach (ColumnHeader col in listView.Columns)
+            foreach (var tc in tcPoses)
+            {
+                var item = new ListViewItem(tc.Name ?? "");
+                item.UseItemStyleForSubItems = false;
+                item.SubItems.Add(tc.PathName ?? "");
+                item.SubItems.Add(string.Format("{0:F2}", tc.J1));
+                item.SubItems.Add(string.Format("{0:F2}", tc.J2));
+                item.SubItems.Add(string.Format("{0:F2}", tc.J3));
+                item.SubItems.Add(string.Format("{0:F2}", tc.J4));
+                item.SubItems.Add(string.Format("{0:F2}", tc.J5));
+                item.SubItems.Add(string.Format("{0:F2}", tc.J6));
+
+                double tcA = config.CalculateJ23Angle(tc);
+                var sub = item.SubItems.Add(string.Format("{0:F2}", tcA));
+
+                if (tcA >= tcMax2)
+                {
+                    if (tcA >= bodyMax23)
+                        sub.BackColor = ColorPalette.OKLight;
+                    else if (bodyMax23 - tcA < threshold)
+                        sub.BackColor = ColorPalette.WarningLight;
+                    else
+                        sub.BackColor = ColorPalette.NOKLight;
+                }
+                else if (tcA <= tcMin2)
+                {
+                    if (tcA <= bodyMin23)
+                        sub.BackColor = ColorPalette.Info;
+                    else if (tcA - bodyMin23 < threshold)
+                        sub.BackColor = ColorPalette.WarningLight;
+                    else
+                        sub.BackColor = ColorPalette.NOKLight;
+                }
+
+                tcListView.Items.Add(item);
+            }
+
+            foreach (ColumnHeader col in bodyListView.Columns)
+                col.Width = -2;
+
+            foreach (ColumnHeader col in tcListView.Columns)
                 col.Width = -2;
         }
     }
