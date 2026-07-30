@@ -86,6 +86,7 @@
     <Compile Include="TempComp\Services\PoseStatisticsCalculator.cs" />
     <Compile Include="TempComp\Services\TempCompAnalyzer.cs" />
     <Compile Include="TempComp\Services\TempCompEvaluationService.cs" />
+    <Compile Include="TempComp\Services\TempCompJsonExporter.cs" />
     <Compile Include="TempComp\TempCompCalculations.cs" />
     <Compile Include="TempComp\Validators\AxisMaxCoverageValidator.cs" />
     <Compile Include="TempComp\Validators\FilterMode.cs" />

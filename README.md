@@ -26,7 +26,7 @@ Repository: `https://dev.azure.com/ac-it-mvs/cad-simulation/_git/ISRA_PS_AddOns`
 
 | Add-On | Description | Status |
 |---|---|---|
-| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export | v1.3 |
+| **TempComp Validator** | Validates Temp Comp measurement path coverage with Excel export and AI Evaluation | v1.3 |
 | **LED Visibility Analyzer** | Validates AccuSite star placement vs tracker FOV with Excel export | v1.0 |
 
 ---
@@ -60,7 +60,7 @@ Robot type is auto-detected from the robot 3D file path and can be overridden ma
 
 J4/J6 values are displayed and evaluated as raw (non-normalized) values in the Validation tab, Raw Data tab, and Gap Analysis tab.
 
-J4/J6 **differences** in the Nearest TC Point tab are normalized to +/-180° (shortest arc) for distance calculation purposes only.
+J4/J6 differences in the Nearest TC Point tab are normalized to +/-180° (shortest arc) for distance calculation purposes only.
 
 ### Measurement Point Filter
 
@@ -93,9 +93,23 @@ Supports multiple operation types:
 - Yellow: between threshold and 2x threshold
 - Red: above 2x threshold
 
-**Raw Data Tab** — All body and TC poses with joint values and path names. J4/J6 displayed as raw (non-normalized) values. Columns can be sorted by clicking the header.
+**Raw Data Tab** — All body and TC poses with joint values and path names. J4/J6 displayed as raw values. Columns sortable by clicking the header.
 
 **Gap Analysis Tab** — TC measurement point values sorted per axis (J2, J3, J4, J5, J6, J2-3). User-configurable gap threshold per axis (default 25°). Red cells indicate gaps exceeding the threshold. Each value shows source program and point name for traceability.
+
+### AI Evaluation
+
+The **AI Evaluation** button runs a two-stage analysis:
+
+1. **Rule-based evaluation** — identifies NOK criteria and gap issues, suggests which TC or Body points to modify with concrete angle values
+2. **Copilot AI analysis** — sends a compact JSON summary of the issues to GitHub Copilot CLI and displays the AI-generated optimization recommendations
+
+Results are shown in a dialog with:
+- Overall status summary
+- Color-coded findings table (Critical / Warning)
+- Copilot AI text analysis with token usage info
+
+> Requires GitHub Copilot CLI installed and authenticated. See Developer Onboarding Guide for setup.
 
 ### Excel Export
 
@@ -159,6 +173,7 @@ via PS API.
 - .NET Framework 4.8 SDK
 - Process Simulate 2408 installation for testing
 - Azure DevOps access (atlascopco-itba organization)
+- GitHub Copilot CLI (for AI Evaluation feature)
 
 ---
 

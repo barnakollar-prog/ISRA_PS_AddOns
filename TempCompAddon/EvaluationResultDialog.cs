@@ -8,14 +8,14 @@ namespace TempCompAddon
 {
     public class EvaluationResultDialog : TxForm
     {
-        public EvaluationResultDialog(EvaluationResult result)
+        public EvaluationResultDialog(EvaluationResult result, string copilotOutput, string tokenInfo)
         {
             if (result == null) throw new ArgumentNullException(nameof(result));
 
             Text = "AI Evaluation — TempComp Analysis";
-            Size = new Size(1080, 700);
+            Size = new Size(1080, 800);
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(900, 560);
+            MinimumSize = new Size(900, 600);
             Font = new Font("Segoe UI", 9);
             BackColor = Color.FromArgb(245, 247, 250);
             SemiModal = false;
@@ -25,12 +25,13 @@ namespace TempCompAddon
             var layout = new TableLayoutPanel
             {
                 Dock = DockStyle.Fill,
-                RowCount = 3,
+                RowCount = 4,
                 ColumnCount = 1,
                 Padding = new Padding(14)
             };
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 108f));  // summary
-            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));   // grid
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));    // grid
+            layout.RowStyles.Add(new RowStyle(SizeType.Percent, 50f));    // copilot
             layout.RowStyles.Add(new RowStyle(SizeType.Absolute, 48f));   // footer
 
             // ── Summary ───────────────────────────────────────
@@ -181,6 +182,45 @@ namespace TempCompAddon
 
             layout.Controls.Add(grid, 0, 1);
 
+            // ── Copilot Output ────────────────────────────────
+            var pnlCopilot = new Panel
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.White,
+                Padding = new Padding(8)
+            };
+
+            string headerText = "Copilot AI Analysis";
+            if (!string.IsNullOrEmpty(tokenInfo))
+                headerText += $"   ({tokenInfo})";
+
+            var lblCopilotHeader = new Label
+            {
+                Text = headerText,
+                Dock = DockStyle.Top,
+                Height = 24,
+                Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+                ForeColor = Color.FromArgb(0, 84, 166),
+                TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            var txtCopilot = new RichTextBox
+            {
+                Dock = DockStyle.Fill,
+                ReadOnly = true,
+                BackColor = Color.FromArgb(248, 250, 252),
+                Font = new Font("Segoe UI", 9f),
+                BorderStyle = BorderStyle.None,
+                Text = string.IsNullOrEmpty(copilotOutput)
+                    ? "Copilot CLI not available or no output returned."
+                    : copilotOutput,
+                ScrollBars = RichTextBoxScrollBars.Vertical
+            };
+
+            pnlCopilot.Controls.Add(txtCopilot);
+            pnlCopilot.Controls.Add(lblCopilotHeader);
+            layout.Controls.Add(pnlCopilot, 0, 2);
+
             // ── Footer ────────────────────────────────────────
             var footer = new Panel
             {
@@ -215,7 +255,7 @@ namespace TempCompAddon
 
             footer.Controls.Add(btnClose);
             footer.Controls.Add(lblCount);
-            layout.Controls.Add(footer, 0, 2);
+            layout.Controls.Add(footer, 0, 3);
 
             Controls.Add(layout);
         }

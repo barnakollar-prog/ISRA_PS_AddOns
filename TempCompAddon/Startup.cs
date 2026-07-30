@@ -902,10 +902,10 @@ namespace TempCompAddon
             TempCompAddon.Services.TempCompExcelExporter.Export(data);
         }
 
-        public void ShowEvaluationResult(EvaluationResult result)
+        public void ShowEvaluationResult(EvaluationResult result, string copilotOutput, string tokenInfo)
         {
-            var dialog = new EvaluationResultDialog(result);
-            dialog.Show(this);
+            var dialog = new EvaluationResultDialog(result, copilotOutput, tokenInfo);
+            dialog.ShowDialog();
         }
 
         // ── Helpers ───────────────────────────────────────────────

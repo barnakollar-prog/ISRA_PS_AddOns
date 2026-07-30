@@ -1,14 +1,15 @@
-using System;
-using System.Collections.Generic;
-using System.Windows.Forms;
-using Tecnomatix.Engineering;
-using ISRA.Core.UI;
-using ISRA.Core.Domain;
 using ISRA.Calculations.TempComp;
 using ISRA.Calculations.TempComp.Domain;
 using ISRA.Calculations.TempComp.Domain.Results;
 using ISRA.Calculations.TempComp.RobotConfiguration;
 using ISRA.Calculations.TempComp.Services;
+using ISRA.Core.Domain;
+using ISRA.Core.UI;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
+using Tecnomatix.Engineering;
 
 namespace TempCompAddon.Presentation
 {
@@ -189,15 +190,74 @@ namespace TempCompAddon.Presentation
                 return;
             }
 
+            // 1. Rule-based evaluation
             var service = new TempCompEvaluationService();
-            var result = service.Evaluate(
+            var ruleResult = service.Evaluate(
                 _lastReport,
                 _lastGapResult,
                 _lastBodyPoses,
                 _lastTempCompPoses,
                 _lastRobotConfig);
 
-            _view.ShowEvaluationResult(result);
+            // 2. JSON export for Copilot CLI
+            var jsonExporter = new TempCompJsonExporter();
+            string robotType = _view.SelectedRobotType ?? "Unknown";
+            string json = jsonExporter.ExportForEvaluation(
+                _lastReport,
+                _lastGapResult,
+                robotType);
+
+            // 3. Copilot CLI call
+            string copilotOutput = null;
+            string tokenInfo = null;
+            try
+            {
+                string prompt =
+                    "You are a robot measurement expert. Analyze this TempComp validation result " +
+                    "and provide concrete optimization suggestions. Focus on which TC measurement points " +
+                    "should be modified and in which direction, and which body points could potentially " +
+                    "be measured from an alternative sensor position to reduce the required range. " +
+                    "Be concise and practical. Data: " + json;
+
+                var psi = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "copilot",
+                    Arguments = $"--prompt \"{prompt.Replace("\"", "\\\"")}\"",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    StandardOutputEncoding = System.Text.Encoding.UTF8  // ← ÚJ
+                };
+
+                using (var process = System.Diagnostics.Process.Start(psi))
+                {
+                    copilotOutput = process.StandardOutput.ReadToEnd();
+                    process.WaitForExit();
+                }
+
+                // Extract token info from output
+                var lines = copilotOutput.Split('\n');
+                var tokenLine = Array.Find(lines, l => l.TrimStart().StartsWith("Tokens"));
+                var creditLine = Array.Find(lines, l => l.TrimStart().StartsWith("AI Credits"));
+                if (tokenLine != null || creditLine != null)
+                    tokenInfo = $"{creditLine?.Trim()} | {tokenLine?.Trim()}";
+
+                // Remove metadata lines from output
+                copilotOutput = string.Join("\n", lines
+                    .Where(l => !l.StartsWith("AI Credits") &&
+                                !l.StartsWith("Tokens") &&
+                                !l.StartsWith("Changes") &&
+                                !l.StartsWith("Resume"))
+                    .ToArray()).Trim();
+            }
+            catch (Exception ex)
+            {
+                copilotOutput = $"Copilot CLI not available: {ex.Message}";
+            }
+
+            // 4. Show result
+            _view.ShowEvaluationResult(ruleResult, copilotOutput, tokenInfo);
         }
 
         /// <summary>
@@ -274,7 +334,7 @@ namespace TempCompAddon.Presentation
         bool HasResults { get; }
         void ShowExportDialog(TempCompExportData data);
 
-        void ShowEvaluationResult(EvaluationResult result);
+        void ShowEvaluationResult(EvaluationResult result, string copilotOutput, string tokenInfo);
 
         // Error handling
         void ShowError(string message, string title);
