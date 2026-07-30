@@ -905,7 +905,7 @@ namespace TempCompAddon
         public void ShowEvaluationResult(EvaluationResult result)
         {
             var dialog = new EvaluationResultDialog(result);
-            dialog.ShowDialog();
+            dialog.Show(this);
         }
 
         // ── Helpers ───────────────────────────────────────────────
