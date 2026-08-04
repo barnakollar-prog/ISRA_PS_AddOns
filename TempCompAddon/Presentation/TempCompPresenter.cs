@@ -222,7 +222,7 @@ namespace TempCompAddon.Presentation
                 var psi = new System.Diagnostics.ProcessStartInfo
                 {
                     FileName = "copilot",
-                    Arguments = $"--prompt \"{prompt.Replace("\"", "\\\"")}\"",
+                    Arguments = $"--prompt \"{prompt.Replace("\"", "\\\"")}\" --allow-all-tools --silent --no-color --no-auto-update --disable-builtin-mcps",
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
                     UseShellExecute = false,
@@ -232,8 +232,11 @@ namespace TempCompAddon.Presentation
 
                 using (var process = System.Diagnostics.Process.Start(psi))
                 {
-                    copilotOutput = process.StandardOutput.ReadToEnd();
+                    var stdOutTask = process.StandardOutput.ReadToEndAsync();
+                    var stdErrTask = process.StandardError.ReadToEndAsync();
                     process.WaitForExit();
+                    copilotOutput = stdOutTask.Result;
+                    stdErrTask.Wait();
                 }
 
                 // Extract token info from output
