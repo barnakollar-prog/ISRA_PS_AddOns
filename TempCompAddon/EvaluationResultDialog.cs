@@ -12,7 +12,7 @@ namespace TempCompAddon
         {
             if (result == null) throw new ArgumentNullException(nameof(result));
 
-            Text = "AI Evaluation — TempComp Analysis";
+            Text = "TempComp Evaluation Report";
             Size = new Size(1080, 800);
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(900, 600);
@@ -44,7 +44,7 @@ namespace TempCompAddon
 
             var lblTitle = new Label
             {
-                Text = "Evaluation Summary",
+                Text = "Executive Summary",
                 Dock = DockStyle.Top,
                 Height = 26,
                 Font = new Font("Segoe UI Semibold", 11f, FontStyle.Bold),
@@ -52,20 +52,21 @@ namespace TempCompAddon
                 TextAlign = ContentAlignment.MiddleLeft
             };
 
+            var isValid = result.IsValid;
             var lblStatus = new Label
             {
-                Text = result.IsValid ? "STATUS: OK" : "STATUS: ACTION NEEDED",
+                Text = isValid ? "RESULT: ACCEPTED" : "RESULT: REVIEW REQUIRED",
                 AutoSize = false,
-                Width = 180,
+                Width = 210,
                 Height = 24,
-                Left = pnlSummary.Width - 192,
+                Left = pnlSummary.Width - 222,
                 Top = 14,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right,
                 TextAlign = ContentAlignment.MiddleCenter,
-                BackColor = result.IsValid
+                BackColor = isValid
                     ? Color.FromArgb(215, 242, 220)
                     : Color.FromArgb(255, 238, 204),
-                ForeColor = result.IsValid
+                ForeColor = isValid
                     ? Color.FromArgb(20, 90, 40)
                     : Color.FromArgb(130, 78, 0),
                 Font = new Font("Segoe UI", 8.5f, FontStyle.Bold)
@@ -73,7 +74,9 @@ namespace TempCompAddon
 
             var lblSummary = new Label
             {
-                Text = result.Summary,
+                Text = string.IsNullOrWhiteSpace(result.Summary)
+                    ? "No summary was generated for this evaluation run."
+                    : result.Summary,
                 Dock = DockStyle.Bottom,
                 Height = 58,
                 TextAlign = ContentAlignment.MiddleLeft,
@@ -152,32 +155,45 @@ namespace TempCompAddon
             grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "TcSuggestion",
-                HeaderText = "TC Suggestion",
+                HeaderText = "Thermal Compensation Suggestion",
                 FillWeight = 30
             });
             grid.Columns.Add(new DataGridViewTextBoxColumn
             {
                 Name = "BodySuggestion",
-                HeaderText = "Body Suggestion",
+                HeaderText = "Body Parameter Suggestion",
                 FillWeight = 30
             });
 
-            foreach (var finding in result.Findings)
+            int criticalCount = 0;
+            int warningCount = 0;
+
+            if (result.Findings != null)
             {
-                int rowIdx = grid.Rows.Add(
-                    finding.Severity == "Critical" ? "Critical" : "Warning",
-                    finding.Axis,
-                    finding.Issue,
-                    finding.TcSuggestion ?? "",
-                    finding.BodySuggestion ?? "—"
-                );
+                foreach (var finding in result.Findings)
+                {
+                    var isCritical = string.Equals(finding.Severity, "Critical", StringComparison.OrdinalIgnoreCase);
+                    var severityText = isCritical ? "Critical" : "Warning";
+                    if (isCritical)
+                        criticalCount++;
+                    else
+                        warningCount++;
 
-                Color rowColor = finding.Severity == "Critical"
-                    ? Color.FromArgb(255, 232, 232)
-                    : Color.FromArgb(255, 247, 221);
+                    int rowIdx = grid.Rows.Add(
+                        severityText,
+                        finding.Axis,
+                        finding.Issue,
+                        finding.TcSuggestion ?? "",
+                        finding.BodySuggestion ?? "—"
+                    );
 
-                grid.Rows[rowIdx].DefaultCellStyle.BackColor = rowColor;
-                grid.Rows[rowIdx].Cells[0].Style.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+                    Color rowColor = isCritical
+                        ? Color.FromArgb(255, 232, 232)
+                        : Color.FromArgb(255, 247, 221);
+
+                    grid.Rows[rowIdx].DefaultCellStyle.BackColor = rowColor;
+                    grid.Rows[rowIdx].Cells[0].Style.Font = new Font("Segoe UI", 9f, FontStyle.Bold);
+                }
             }
 
             layout.Controls.Add(grid, 0, 1);
@@ -187,38 +203,55 @@ namespace TempCompAddon
             {
                 Dock = DockStyle.Fill,
                 BackColor = Color.White,
-                Padding = new Padding(8)
+                Padding = new Padding(0)
             };
 
-            string headerText = "Copilot AI Analysis";
+            var pnlCopilotHeader = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 34,
+                Padding = new Padding(10, 0, 10, 0),
+                BackColor = Color.FromArgb(245, 249, 255)
+            };
+
+            string headerText = "AI-Assisted Technical Analysis";
             if (!string.IsNullOrEmpty(tokenInfo))
                 headerText += $"   ({tokenInfo})";
 
             var lblCopilotHeader = new Label
             {
                 Text = headerText,
-                Dock = DockStyle.Top,
-                Height = 24,
+                Dock = DockStyle.Fill,
                 Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
                 ForeColor = Color.FromArgb(0, 84, 166),
                 TextAlign = ContentAlignment.MiddleLeft
+            };
+
+            var pnlCopilotContent = new Panel
+            {
+                Dock = DockStyle.Fill,
+                Padding = new Padding(10, 8, 10, 10),
+                BackColor = Color.White
             };
 
             var txtCopilot = new RichTextBox
             {
                 Dock = DockStyle.Fill,
                 ReadOnly = true,
-                BackColor = Color.FromArgb(248, 250, 252),
+                BackColor = Color.FromArgb(252, 253, 255),
                 Font = new Font("Segoe UI", 9f),
-                BorderStyle = BorderStyle.None,
-                Text = string.IsNullOrEmpty(copilotOutput)
-                    ? "Copilot CLI not available or no output returned."
-                    : copilotOutput,
-                ScrollBars = RichTextBoxScrollBars.Vertical
+                BorderStyle = BorderStyle.FixedSingle,
+                ScrollBars = RichTextBoxScrollBars.Vertical,
+                DetectUrls = true,
+                WordWrap = true
             };
 
-            pnlCopilot.Controls.Add(txtCopilot);
-            pnlCopilot.Controls.Add(lblCopilotHeader);
+            PopulateAnalysisText(txtCopilot, copilotOutput);
+
+            pnlCopilotHeader.Controls.Add(lblCopilotHeader);
+            pnlCopilotContent.Controls.Add(txtCopilot);
+            pnlCopilot.Controls.Add(pnlCopilotContent);
+            pnlCopilot.Controls.Add(pnlCopilotHeader);
             layout.Controls.Add(pnlCopilot, 0, 2);
 
             // ── Footer ────────────────────────────────────────
@@ -230,9 +263,13 @@ namespace TempCompAddon
 
             var lblCount = new Label
             {
-                Text = string.Format("Findings: {0}", result.Findings == null ? 0 : result.Findings.Count),
+                Text = string.Format(
+                    "Findings: {0}   |   Critical: {1}   |   Warning: {2}",
+                    result.Findings == null ? 0 : result.Findings.Count,
+                    criticalCount,
+                    warningCount),
                 Dock = DockStyle.Left,
-                Width = 180,
+                Width = 420,
                 TextAlign = ContentAlignment.MiddleLeft,
                 Font = new Font("Segoe UI", 8.5f),
                 ForeColor = Color.FromArgb(96, 96, 96)
@@ -258,6 +295,67 @@ namespace TempCompAddon
             layout.Controls.Add(footer, 0, 3);
 
             Controls.Add(layout);
+        }
+
+        private static void PopulateAnalysisText(RichTextBox outputBox, string content)
+        {
+            outputBox.Clear();
+
+            if (string.IsNullOrWhiteSpace(content))
+            {
+                outputBox.SelectionColor = Color.FromArgb(110, 110, 110);
+                outputBox.SelectionFont = new Font("Segoe UI", 9f, FontStyle.Italic);
+                outputBox.AppendText("No AI analysis output is available for this evaluation.");
+                outputBox.SelectionStart = 0;
+                outputBox.SelectionLength = 0;
+                return;
+            }
+
+            var lines = content.Replace("\r\n", "\n").Split('\n');
+            foreach (var rawLine in lines)
+            {
+                var line = rawLine?.TrimEnd() ?? string.Empty;
+
+                if (string.IsNullOrWhiteSpace(line))
+                {
+                    outputBox.AppendText(Environment.NewLine);
+                    continue;
+                }
+
+                if (IsAnalysisHeading(line))
+                {
+                    outputBox.SelectionColor = Color.FromArgb(0, 84, 166);
+                    outputBox.SelectionFont = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
+                    outputBox.AppendText(NormalizeHeading(line));
+                    outputBox.AppendText(Environment.NewLine);
+                    continue;
+                }
+
+                outputBox.SelectionColor = Color.FromArgb(40, 40, 40);
+                outputBox.SelectionFont = new Font("Segoe UI", 9f, FontStyle.Regular);
+                outputBox.AppendText(line);
+                outputBox.AppendText(Environment.NewLine);
+            }
+
+            outputBox.SelectionStart = 0;
+            outputBox.SelectionLength = 0;
+        }
+
+        private static bool IsAnalysisHeading(string line)
+        {
+            if (line.StartsWith("### ", StringComparison.Ordinal) ||
+                line.StartsWith("## ", StringComparison.Ordinal) ||
+                line.StartsWith("# ", StringComparison.Ordinal))
+            {
+                return true;
+            }
+
+            return line.EndsWith(":", StringComparison.Ordinal) && line.Length <= 80;
+        }
+
+        private static string NormalizeHeading(string line)
+        {
+            return line.TrimStart('#', ' ').Trim();
         }
     }
 }
