@@ -8,6 +8,7 @@ using ISRA.Core.UI;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 using Tecnomatix.Engineering;
 using Tecnomatix.Engineering.Olp;
@@ -21,8 +22,6 @@ namespace TempCompAddon.Presentation
     /// </summary>
     public class TempCompPresenter : IPresenter
     {
-        [System.Runtime.InteropServices.DllImport("user32.dll")]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
         private readonly ITempCompView _view;
         private AnalysisReport _lastReport;
         private List<NearestTcResult> _lastNearestResults;
@@ -38,6 +37,96 @@ namespace TempCompAddon.Presentation
         {
             _view = view ?? throw new ArgumentNullException(nameof(view));
         }
+
+    internal static class NativeMethods
+    {
+        private const int SW_RESTORE = 9;
+        private const uint INPUT_KEYBOARD = 1;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const ushort VK_MENU = 0x12;
+        private const ushort VK_G = 0x47;
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint type;
+            public InputUnion U;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct InputUnion
+        {
+            [FieldOffset(0)]
+            public KEYBDINPUT ki;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT
+        {
+            public ushort wVk;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        public static void SendAltG(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return;
+
+            ShowWindow(hWnd, SW_RESTORE);
+            SetForegroundWindow(hWnd);
+            System.Threading.Thread.Sleep(50);
+
+            INPUT[] inputs =
+            {
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_MENU, wScan = 0, dwFlags = 0, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_G, wScan = 0, dwFlags = 0, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_G, wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_MENU, wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                }
+            };
+
+            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
+        }
+    }
 
         /// <summary>
         /// Executes the TempComp analysis.
@@ -266,14 +355,16 @@ namespace TempCompAddon.Presentation
             // 4. Show result
             _view.ShowEvaluationResult(ruleResult, copilotOutput, tokenInfo);
         }
-        public void JumpToLocation(string pathName, string poseName)
+        public void JumpToLocation(string pathName, string poseName, bool isBodyPoint = false)
         {
             try
             {
                 // Find the location in TC programs
                 ITxRoboticLocationOperation targetLoc = null;
-
-                foreach (var program in _view.TempCompPrograms)
+                var programs = isBodyPoint
+                    ? (IEnumerable<TxWeldOperation>)_view.BodyPrograms
+                    : _view.TempCompPrograms;
+                foreach (var program in programs)
                 {
                     if (program.Name != pathName) continue;
 
@@ -317,12 +408,8 @@ namespace TempCompAddon.Presentation
                     var psProcess = System.Diagnostics.Process.GetProcessesByName("tune").FirstOrDefault();
                     if (psProcess != null && psProcess.MainWindowHandle != IntPtr.Zero)
                     {
-                        SetForegroundWindow(psProcess.MainWindowHandle);
-                        System.Threading.Thread.Sleep(200);
+                        SendAltGToWindow(psProcess.MainWindowHandle);
                     }
-
-                    // 3. Alt+G küldése
-                    System.Windows.Forms.SendKeys.SendWait("%g");
                 }
                 else
                 {
@@ -333,6 +420,11 @@ namespace TempCompAddon.Presentation
             {
                 _view.ShowError($"Jump error: {ex.Message}", "Error");
             }
+        }
+
+        private static void SendAltGToWindow(IntPtr hWnd)
+        {
+            NativeMethods.SendAltG(hWnd);
         }
 
         /// <summary>
@@ -369,6 +461,96 @@ namespace TempCompAddon.Presentation
                 default:
                     return new FanucConfiguration();
             }
+        }
+    }
+
+    internal static class NativeMethods
+    {
+        private const int SW_RESTORE = 9;
+        private const uint INPUT_KEYBOARD = 1;
+        private const uint KEYEVENTF_KEYUP = 0x0002;
+        private const ushort VK_MENU = 0x12;
+        private const ushort VK_G = 0x47;
+
+        [DllImport("user32.dll")]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll", SetLastError = true)]
+        private static extern uint SendInput(uint nInputs, INPUT[] pInputs, int cbSize);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct INPUT
+        {
+            public uint type;
+            public InputUnion U;
+        }
+
+        [StructLayout(LayoutKind.Explicit)]
+        private struct InputUnion
+        {
+            [FieldOffset(0)]
+            public KEYBDINPUT ki;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct KEYBDINPUT
+        {
+            public ushort wVk;
+            public ushort wScan;
+            public uint dwFlags;
+            public uint time;
+            public IntPtr dwExtraInfo;
+        }
+
+        public static void SendAltG(IntPtr hWnd)
+        {
+            if (hWnd == IntPtr.Zero)
+                return;
+
+            ShowWindow(hWnd, SW_RESTORE);
+            SetForegroundWindow(hWnd);
+            System.Threading.Thread.Sleep(50);
+
+            INPUT[] inputs =
+            {
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_MENU, wScan = 0, dwFlags = 0, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_G, wScan = 0, dwFlags = 0, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_G, wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                },
+                new INPUT
+                {
+                    type = INPUT_KEYBOARD,
+                    U = new InputUnion
+                    {
+                        ki = new KEYBDINPUT { wVk = VK_MENU, wScan = 0, dwFlags = KEYEVENTF_KEYUP, time = 0, dwExtraInfo = IntPtr.Zero }
+                    }
+                }
+            };
+
+            SendInput((uint)inputs.Length, inputs, Marshal.SizeOf(typeof(INPUT)));
         }
     }
 

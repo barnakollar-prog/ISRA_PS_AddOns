@@ -528,6 +528,7 @@ namespace TempCompAddon
                 Font = new Font("Consolas", 8)
             };
             lstRawBody.ColumnClick += OnRawBodyColumnClick;
+            lstRawBody.MouseClick += OnRawBodyMouseClick;
             lstRawBody.Columns.Add("Body Point", 110);
             lstRawBody.Columns.Add("Body Path", 120);
             lstRawBody.Columns.Add("J1", 50);
@@ -554,6 +555,7 @@ namespace TempCompAddon
                 Font = new Font("Consolas", 8)
             };
             lstRawTc.ColumnClick += OnRawTcColumnClick;
+            lstRawTc.MouseClick += OnRawTcMouseClick;
             lstRawTc.Columns.Add("TC Point", 110);
             lstRawTc.Columns.Add("TC Path", 120);
             lstRawTc.Columns.Add("TC J1", 50);
@@ -758,6 +760,47 @@ namespace TempCompAddon
         {
             if (_pickMode == PickMode.None) return;
             AddFromSelection(TxApplication.ActiveSelection.GetItems());
+        }
+        private void OnRawBodyMouseClick(object sender, MouseEventArgs e)
+        {
+            var lv = sender as ListView;
+            if (lv == null) return;
+
+            var hit = lv.HitTest(e.Location);
+            var item = hit.Item;
+            if (item == null || hit.SubItem == null) return;
+
+            int columnIndex = item.SubItems.IndexOf(hit.SubItem);
+            if (columnIndex != 0) return;
+            if (item.SubItems.Count < 2) return;
+
+            string poseName = item.SubItems[0].Text;        // Body Point (0. oszlop)
+            string pathName = item.SubItems[1].Text;        // Body Path (1. oszlop)
+            if (string.IsNullOrWhiteSpace(poseName) || string.IsNullOrWhiteSpace(pathName)) return;
+
+
+            _presenter.JumpToLocation(pathName, poseName, isBodyPoint: true);
+        }
+
+        private void OnRawTcMouseClick(object sender, MouseEventArgs e)
+        {
+            var lv = sender as ListView;
+            if (lv == null) return;
+
+            var hit = lv.HitTest(e.Location);
+            var item = hit.Item;
+            if (item == null || hit.SubItem == null) return;
+
+            int columnIndex = item.SubItems.IndexOf(hit.SubItem);
+            if (columnIndex != 0) return;
+            if (item.SubItems.Count < 2) return;
+
+            string poseName = item.SubItems[0].Text;        // TC Point (0. oszlop)
+            string pathName = item.SubItems[1].Text;        // TC Path (1. oszlop)
+            if (string.IsNullOrWhiteSpace(poseName) || string.IsNullOrWhiteSpace(pathName)) return;
+
+
+            _presenter.JumpToLocation(pathName, poseName, isBodyPoint: false);
         }
         // ── ÚJ: shift-tel bővített kijelölés kezelése (2408) ──
         private void OnSelectionAdded(object sender, TxSelection_ItemsAddedEventArgs e)
@@ -982,20 +1025,10 @@ namespace TempCompAddon
             var grid = sender as DataGridView;
             if (grid == null) return;
 
-            // Point oszlop keresése
-            int pointColIdx = -1;
-            foreach (DataGridViewColumn col in grid.Columns)
-            {
-                if (col.HeaderText.Contains("Point"))
-                {
-                    pointColIdx = col.Index;
-                    break;
-                }
-            }
+            // Ellenőrizzük hogy a kattintott oszlop "Point" oszlop-e
+            if (!grid.Columns[e.ColumnIndex].HeaderText.Contains("Point")) return;
 
-            if (pointColIdx < 0 || e.ColumnIndex != pointColIdx) return;
-
-            var cell = grid.Rows[e.RowIndex].Cells[pointColIdx];
+            var cell = grid.Rows[e.RowIndex].Cells[e.ColumnIndex];
             string cellValue = cell.Value as string;
             if (string.IsNullOrEmpty(cellValue)) return;
 
