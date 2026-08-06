@@ -10,6 +10,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Windows.Forms;
 using Tecnomatix.Engineering;
+using Tecnomatix.Engineering.Olp;
+using Tecnomatix.Engineering.Olp.OLP_Utilities;
 
 namespace TempCompAddon.Presentation
 {
@@ -19,6 +21,8 @@ namespace TempCompAddon.Presentation
     /// </summary>
     public class TempCompPresenter : IPresenter
     {
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
         private readonly ITempCompView _view;
         private AnalysisReport _lastReport;
         private List<NearestTcResult> _lastNearestResults;
@@ -261,6 +265,74 @@ namespace TempCompAddon.Presentation
 
             // 4. Show result
             _view.ShowEvaluationResult(ruleResult, copilotOutput, tokenInfo);
+        }
+        public void JumpToLocation(string pathName, string poseName)
+        {
+            try
+            {
+                // Find the location in TC programs
+                ITxRoboticLocationOperation targetLoc = null;
+
+                foreach (var program in _view.TempCompPrograms)
+                {
+                    if (program.Name != pathName) continue;
+
+                    var locations = program.GetAllDescendants(
+                        new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
+
+                    foreach (ITxObject obj in locations)
+                    {
+                        var loc = obj as ITxRoboticLocationOperation;
+                        if (loc != null && loc.Name == poseName)
+                        {
+                            targetLoc = loc;
+                            break;
+                        }
+                    }
+                    if (targetLoc != null) break;
+                }
+
+                if (targetLoc == null)
+                {
+                    _view.ShowError(
+                        $"Location '{poseName}' not found in path '{pathName}'.",
+                        "Jump Failed");
+                    return;
+                }
+
+                // Jump to location
+                var followMode = new TxOlpRobotFollowMode(_view.SelectedRobot);
+                bool reached = followMode.JumpRobotToLocation(targetLoc);
+                TxApplication.RefreshDisplay();
+
+                if (reached)
+                {
+                    // 1. Location kijelölése az Operation Tree-ben
+                    var selection = new TxObjectList();
+                    selection.Add(targetLoc);
+                    TxApplication.ActiveSelection.SetItems(selection);
+                    TxApplication.RefreshDisplay();
+
+                    // 2. PS főablaknak fókusz
+                    var psProcess = System.Diagnostics.Process.GetProcessesByName("tune").FirstOrDefault();
+                    if (psProcess != null && psProcess.MainWindowHandle != IntPtr.Zero)
+                    {
+                        SetForegroundWindow(psProcess.MainWindowHandle);
+                        System.Threading.Thread.Sleep(200);
+                    }
+
+                    // 3. Alt+G küldése
+                    System.Windows.Forms.SendKeys.SendWait("%g");
+                }
+                else
+                {
+                    _view.ShowError($"Robot cannot reach location '{poseName}'.", "Jump Failed");
+                }
+            }
+            catch (Exception ex)
+            {
+                _view.ShowError($"Jump error: {ex.Message}", "Error");
+            }
         }
 
         /// <summary>

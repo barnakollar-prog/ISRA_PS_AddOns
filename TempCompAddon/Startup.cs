@@ -613,6 +613,7 @@ namespace TempCompAddon
                 GridColor = Color.LightGray,
                 BackgroundColor = Color.White
             };
+            dgvGapAnalysis.CellClick += OnGapAnalysisCellClick;
 
             tabGap.Controls.Add(dgvGapAnalysis);
             tabGap.Controls.Add(pnlGapSettings);
@@ -974,6 +975,39 @@ namespace TempCompAddon
             lstRawTc.ListViewItemSorter = new ListViewItemComparer(e.Column, _rawTcSortOrder);
             lstRawTc.Sort();
         }//
+        private void OnGapAnalysisCellClick(object sender, DataGridViewCellEventArgs e)
+        {
+            if (e.RowIndex < 0) return;
+
+            var grid = sender as DataGridView;
+            if (grid == null) return;
+
+            // Point oszlop keresése
+            int pointColIdx = -1;
+            foreach (DataGridViewColumn col in grid.Columns)
+            {
+                if (col.HeaderText.Contains("Point"))
+                {
+                    pointColIdx = col.Index;
+                    break;
+                }
+            }
+
+            if (pointColIdx < 0 || e.ColumnIndex != pointColIdx) return;
+
+            var cell = grid.Rows[e.RowIndex].Cells[pointColIdx];
+            string cellValue = cell.Value as string;
+            if (string.IsNullOrEmpty(cellValue)) return;
+
+            // "UP107 - ART1_7" szétválasztása
+            var parts = cellValue.Split(new[] { " - " }, StringSplitOptions.None);
+            if (parts.Length != 2) return;
+
+            string pathName = parts[0].Trim();
+            string poseName = parts[1].Trim();
+
+            _presenter.JumpToLocation(pathName, poseName);
+        }
         private class ListViewItemComparer : System.Collections.IComparer
         {
             private readonly int _col;
