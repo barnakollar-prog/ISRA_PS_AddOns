@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TecnomatixConfigurationData>
+  <ConfigurationsSection>
+	<Configuration ID="newassembler" Name="newassembler">
+	  <DotNetCommands>
+		<Assembly File="DotNetCommands\AddPrepositions\ISRA Robot Program Manipulator.dll">
+		  <DotNetCommand Namespace="ISRA.RobotProgramManipulator" ClassName="RobotProgramManipulatorCommand" PlatformMode="Standard|VCLite" />
+		</Assembly>
+	  </DotNetCommands>
+	</Configuration>
+	<Configuration ID="newassemblertc" Name="newassemblertc">
+	  <DotNetCommands>
+		<Assembly File="DotNetCommands\AddPrepositions\ISRA Robot Program Manipulator.dll">
+		  <DotNetCommand Namespace="ISRA.RobotProgramManipulator" ClassName="RobotProgramManipulatorCommand" PlatformMode="Standard|VCLite" />
+		</Assembly>
+	  </DotNetCommands>
+	</Configuration>
+	<Configuration ID="robotexpert" Name="robotexpert">
+	  <DotNetCommands>
+		<Assembly File="DotNetCommands\AddPrepositions\ISRA Robot Program Manipulator.dll">
+		  <DotNetCommand Namespace="ISRA.RobotProgramManipulator" ClassName="RobotProgramManipulatorCommand" PlatformMode="Standard|VCLite" />
+		</Assembly>
+	  </DotNetCommands>
+	</Configuration>
+  </ConfigurationsSection>
+</TecnomatixConfigurationData>
