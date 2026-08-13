@@ -58,6 +58,7 @@
   <ItemGroup>
     <Compile Include="Accusite\CollisionCheck.cs" />
     <Compile Include="Accusite\ConstellationCriteriaEngine.cs" />
+    <Compile Include="Accusite\ConstellationPathChecker.cs" />
     <Compile Include="Accusite\ConstellationVisibilityChecker.cs" />
     <Compile Include="Accusite\Domain\Results\EmitterVisibilityResult.cs" />
     <Compile Include="TempComp\Domain\Results\EvaluationResult.cs" />
