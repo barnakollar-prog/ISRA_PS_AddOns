@@ -1,10 +1,12 @@
 ﻿using ISRA.Components.AccuSite.SensorHolders;
 using ISRA.Components.AccuSite.Trackers;
+using ISRA.Core.Utilities;
 using System;
 using System.Collections.Generic;
 using Tecnomatix.Engineering;
 using Tecnomatix.Engineering.Olp.OLP_Utilities;
 using Tecnomatix.Engineering.OLP;
+using ISRA.Core.Utilities;
 
 namespace ISRA.Calculations.AccuSite
 {
@@ -15,6 +17,7 @@ namespace ISRA.Calculations.AccuSite
     {
         public string LocationName { get; set; }
         public bool RobotReached { get; set; }
+        public bool HasCollision { get; set; }
         public ConstellationVisibilityResult Visibility { get; set; }
         public ConstellationCriteriaEngine.CriteriaResult Criteria { get; set; }
         public string Label { get; set; }
@@ -43,16 +46,19 @@ namespace ISRA.Calculations.AccuSite
         private readonly ITracker _tracker;
         private readonly TxTransformation _trackerWorld;
         private readonly double _maxAngleDeg;
+        private readonly List<TxComponent> _collisionObjects;
 
         public ConstellationPathChecker(
             TxRobot robot,
             ITracker tracker,
             TxTransformation trackerWorld,
+            List<TxComponent> collisionObjects,
             double maxAngleDeg = 40.0)
         {
             _robot = robot;
             _tracker = tracker;
             _trackerWorld = trackerWorld;
+            _collisionObjects = collisionObjects;
             _maxAngleDeg = maxAngleDeg;
         }
 
@@ -78,7 +84,7 @@ namespace ISRA.Calculations.AccuSite
                 var loc = obj as ITxRoboticLocationOperation;
                 if (loc == null) continue;
 
-                // Jump robot to location
+                // 1. Jump
                 bool reached = followMode.JumpRobotToLocation(loc);
                 TxApplication.RefreshDisplay();
 
@@ -94,7 +100,7 @@ namespace ISRA.Calculations.AccuSite
                     continue;
                 }
 
-                // Find mounted sensor holder
+                // 2. Holder detektálás
                 ISensorHolder holder = null;
                 ITxLocatableObject holderLoc = null;
 
@@ -105,8 +111,10 @@ namespace ISRA.Calculations.AccuSite
 
                     var instance = CreateHolderInstance(comp.Name);
                     if (instance == null) continue;
+
                     holder = instance;
                     holderLoc = comp;
+                    break;
                 }
 
                 if (holder == null || holderLoc == null)
@@ -121,12 +129,29 @@ namespace ISRA.Calculations.AccuSite
                     continue;
                 }
 
-                // Run visibility check
+                // 3. Collision check
+                var collisionResult = RobotCollisionCheck.CheckCollision(
+                    _robot, loc.Name, _collisionObjects);
+
+                if (collisionResult.HasCollision)
+                {
+                    pointResults.Add(new ConstellationPointResult
+                    {
+                        LocationName = loc.Name,
+                        RobotReached = true,
+                        HasCollision = true,
+                        Label = "NOK — COLLISION"
+                    });
+                    nok++;
+                    continue;
+                }
+
+                // 4. Visibility check
                 var visibility = ConstellationVisibilityChecker.Check(
                     holderLoc, holder, _trackerWorld, _tracker,
                     visComponents, _maxAngleDeg);
 
-                // Evaluate criteria
+                // 5. Criteria
                 var criteria = ConstellationCriteriaEngine.Evaluate(visibility);
 
                 if (criteria.IsOk) ok++; else nok++;
@@ -135,6 +160,7 @@ namespace ISRA.Calculations.AccuSite
                 {
                     LocationName = loc.Name,
                     RobotReached = true,
+                    HasCollision = false,
                     Visibility = visibility,
                     Criteria = criteria,
                     Label = criteria.Label
