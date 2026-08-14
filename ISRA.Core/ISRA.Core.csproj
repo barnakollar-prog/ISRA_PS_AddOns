@@ -68,6 +68,7 @@
     <Compile Include="Utilities\AimingGuidelinesProfile.cs" />
     <Compile Include="Utilities\ColorPalette.cs" />
     <Compile Include="Utilities\GeometryHelper.cs" />
+    <Compile Include="Utilities\MpFeatureLookup.cs" />
     <Compile Include="Utilities\RobotCollisionCheck.cs" />
   </ItemGroup>
   <ItemGroup>
