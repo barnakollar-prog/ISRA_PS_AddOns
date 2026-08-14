@@ -110,24 +110,44 @@ namespace ISRA.Calculations.AccuSite
 
         private static EmitterCameraAngleResult[,] RunAngleFilter(
             ITxLocatableObject holderLoc,
-            ISensorHolder holder,
-            SensorEmitterData[] emitters,
-            TxTransformation trackerWorld,
-            ITracker tracker,
-            CameraData[] cameras,
-            double maxAngleDeg)
+    ISensorHolder holder,
+    SensorEmitterData[] emitters,
+    TxTransformation trackerWorld,
+    ITracker tracker,
+    CameraData[] cameras,
+    double maxAngleDeg)
         {
             int eCount = emitters.Length; // 40
             int cCount = cameras.Length;  // 3
             var results = new EmitterCameraAngleResult[eCount, cCount];
+
+            // Precompute tracker inverse for FOV checks
+            TxTransformation trackerInverse = trackerWorld.Inverse;
 
             for (int e = 0; e < eCount; e++)
             {
                 TxVector emitterWorldPos = holder.GetEmitterWorldPosition(holderLoc, emitters[e]);
                 TxVector emitterWorldZ = holder.GetEmitterWorldZVector(holderLoc, emitters[e]);
 
+                // FOV check — transform emitter to tracker local space
+                TxVector emitterLocalPos = trackerInverse.Transform(emitterWorldPos);
+                bool inFov = tracker.IsInFOV(emitterLocalPos);
+
                 for (int c = 0; c < cCount; c++)
                 {
+                    if (!inFov)
+                    {
+                        results[e, c] = new EmitterCameraAngleResult
+                        {
+                            EmitterName = emitters[e].Name,
+                            Group = emitters[e].Group,
+                            CameraName = cameras[c].Name,
+                            AngleDeg = double.NaN,
+                            PassedAngle = false
+                        };
+                        continue;
+                    }
+
                     TxVector cameraWorldPos = tracker.GetCameraWorldPosition(trackerWorld, cameras[c]);
                     double angle = GeometryCalculations.CalculateEmitterAngle(
                                                 emitterWorldPos, emitterWorldZ, cameraWorldPos);
