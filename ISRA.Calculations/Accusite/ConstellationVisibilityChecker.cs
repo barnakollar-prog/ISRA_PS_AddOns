@@ -399,5 +399,17 @@ namespace ISRA.Calculations.AccuSite
                 origin.Y + ax.Y * ax_scale + ay.Y * ay_scale,
                 origin.Z + ax.Z * ax_scale + ay.Z * ay_scale);
         }
+
+        // ── Cleanup ───────────────────────────────────────────────
+
+        public static void DeleteVisualizations(List<TxComponent> visComponents)
+        {
+            foreach (var comp in visComponents)
+            {
+                try { if (comp != null && comp.IsValid()) comp.Delete(); } catch { }
+            }
+            visComponents.Clear();
+            TxApplication.RefreshDisplay();
+        }
     }
-}
+} 
