@@ -66,6 +66,7 @@
     <Compile Include="UI\IPresenter.cs" />
     <Compile Include="UI\IReportFormatter.cs" />
     <Compile Include="Utilities\AimingGuidelinesProfile.cs" />
+    <Compile Include="Utilities\CollisionPairReader.cs" />
     <Compile Include="Utilities\ColorPalette.cs" />
     <Compile Include="Utilities\GeometryHelper.cs" />
     <Compile Include="Utilities\MpFeatureLookup.cs" />

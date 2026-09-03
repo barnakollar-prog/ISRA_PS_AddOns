@@ -183,15 +183,13 @@ namespace ISRA.Calculations.AccuSite
         /// Returns an ISensorHolder instance for the given type ID.
         /// Add new holder types here as the catalog grows.
         /// </summary>
-        private static ISensorHolder CreateHolderInstance(string typeId)
+        private static ISensorHolder CreateHolderInstance(string componentName)
         {
-            switch (typeId)
-            {
-                case "perc_01-03944-10":
-                    return new SensorHolder_Perc_01_03944_10();
-                default:
-                    return null;
-            }
+            if (string.IsNullOrEmpty(componentName)) return null;
+            string name = componentName.ToLower();
+            if (name.Contains("01-03944-10"))
+                return new SensorHolder_Perc_01_03944_10();
+            return null;
         }
     }
 }

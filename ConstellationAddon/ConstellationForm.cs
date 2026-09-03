@@ -1,14 +1,15 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Drawing;
-using System.IO;
-using System.Windows.Forms;
-using Tecnomatix.Engineering;
-using Tecnomatix.Engineering.Ui;
-using ISRA.Calculations.AccuSite;
+﻿using ISRA.Calculations.AccuSite;
 using ISRA.Components.AccuSite.SensorHolders;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Core.Utilities;
+using System;
+using System.Collections.Generic;
+using System.Drawing;
+using System.Windows.Forms;
+using Tecnomatix.Engineering;
+using Tecnomatix.Engineering.Olp.OLP_Utilities;
+using Tecnomatix.Engineering.OLP;
+using Tecnomatix.Engineering.Ui;
 
 namespace ConstellationAddon
 {
@@ -16,26 +17,26 @@ namespace ConstellationAddon
     {
         // ── Controls ──────────────────────────────────────────────
         private TxObjEditBoxCtrl pickerRobot;
-        private TxObjEditBoxCtrl pickerTracker;
+        private TxObjEditBoxCtrl[] pickerTrackers;
+        private ComboBox cmbHolderType;
         private ListView lstPaths;
         private Button btnPickPaths;
         private Button btnClearPaths;
-        private Button btnSetCollision;
-        private Label lblCollisionCount;
-        private TextBox txtJsonPath;
-        private Button btnBrowseJson;
-        private Button btnImportExcel;
-        private Button btnRun;
+        private ComboBox cmbCollisionPair;
+        private Button btnAnalyze;
         private ListView lstResults;
 
         // ── State ─────────────────────────────────────────────────
         private readonly List<TxWeldOperation> _paths
             = new List<TxWeldOperation>();
-        private List<TxComponent> _collisionObjects
-            = new List<TxComponent>();
         private List<TxComponent> _visComponents
             = new List<TxComponent>();
         private bool _pickingPaths = false;
+        
+
+        // ── Configuration — change to scale up ───────────────────
+        private const int TrackerCount = 4;  // → 8 when needed
+        private const int TrackerCols = 2;  // → 4 when needed
 
         public ConstellationForm()
         {
@@ -51,10 +52,10 @@ namespace ConstellationAddon
         private void BuildUI()
         {
             this.Text = "Constellation Validator";
-            this.Width = 820;
-            this.Height = 780;
+            this.Width = 840;
+            this.Height = 860;
             this.FormBorderStyle = FormBorderStyle.Sizable;
-            this.MinimumSize = new Size(600, 600);
+            this.MinimumSize = new Size(640, 660);
 
             int lx = 10;
             int y = 10;
@@ -65,7 +66,7 @@ namespace ConstellationAddon
                 Text = "Robot",
                 Left = lx,
                 Top = y,
-                Width = 785,
+                Width = 806,
                 Height = 52,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
@@ -82,7 +83,7 @@ namespace ConstellationAddon
             {
                 Left = 72,
                 Top = 18,
-                Width = 700,
+                Width = 720,
                 Height = 24,
                 ValidatorType = TxValidatorType.Robot,
                 PickLevel = TxPickLevel.Component,
@@ -94,70 +95,123 @@ namespace ConstellationAddon
             this.Controls.Add(grpRobot);
             y += 62;
 
-            // ── Tracker ───────────────────────────────────────────
-            var grpTracker = new GroupBox
+            // ── Sensor Holder ─────────────────────────────────────
+            var grpHolder = new GroupBox
             {
-                Text = "Tracker",
+                Text = "Sensor Holder Type",
                 Left = lx,
                 Top = y,
-                Width = 785,
+                Width = 806,
                 Height = 52,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            grpTracker.Controls.Add(new Label
+            grpHolder.Controls.Add(new Label
             {
-                Text = "Tracker:",
+                Text = "Type:",
                 Left = 8,
                 Top = 18,
-                Width = 60,
+                Width = 50,
                 Height = 24,
                 TextAlign = ContentAlignment.MiddleLeft
             });
-            pickerTracker = new TxObjEditBoxCtrl
+            cmbHolderType = new ComboBox
             {
-                Left = 72,
-                Top = 18,
-                Width = 700,
+                Left = 62,
+                Top = 16,
+                Width = 730,
                 Height = 24,
-                ValidatorType = TxValidatorType.Component,
-                PickLevel = TxPickLevel.Component,
-                PickOnly = false,
-                ListenToPick = true,
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            grpTracker.Controls.Add(pickerTracker);
-            this.Controls.Add(grpTracker);
+            foreach (var typeId in SensorHolderCatalog.All.Keys)
+                cmbHolderType.Items.Add(typeId);
+            if (cmbHolderType.Items.Count > 0)
+                cmbHolderType.SelectedIndex = 0;
+            grpHolder.Controls.Add(cmbHolderType);
+            this.Controls.Add(grpHolder);
             y += 62;
 
-            // ── Paths ─────────────────────────────────────────────
-            var grpPaths = new GroupBox
+            // ── Trackers (2x2 grid, expandable to 4x2) ───────────
+            int trackerRows = (int)Math.Ceiling((double)TrackerCount / TrackerCols);
+            int cellW = 400;
+            int cellH = 34;
+            int grpTrackerH = 20 + trackerRows * cellH + 8;
+
+            var grpTrackers = new GroupBox
             {
-                Text = "Measurement Paths",
+                Text = string.Format("Trackers (select up to {0}, Tracker 1 required)", TrackerCount),
                 Left = lx,
                 Top = y,
-                Width = 785,
-                Height = 110,
+                Width = 806,
+                Height = grpTrackerH,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            pickerTrackers = new TxObjEditBoxCtrl[TrackerCount];
+
+            for (int i = 0; i < TrackerCount; i++)
+            {
+                int col = i % TrackerCols;
+                int row = i / TrackerCols;
+                int cx = 8 + col * cellW;
+                int cy = 22 + row * cellH;
+
+                grpTrackers.Controls.Add(new Label
+                {
+                    Text = string.Format("Tracker {0}:", i + 1),
+                    Left = cx,
+                    Top = cy + 2,
+                    Width = 78,
+                    Height = 20,
+                    TextAlign = ContentAlignment.MiddleLeft
+                });
+
+                pickerTrackers[i] = new TxObjEditBoxCtrl
+                {
+                    Left = cx + 72,
+                    Top = cy,
+                    Width = 310,
+                    Height = 24,
+                    ValidatorType = TxValidatorType.Component,
+                    PickLevel = TxPickLevel.Component,
+                    PickOnly = false,
+                    ListenToPick = true
+                };
+                grpTrackers.Controls.Add(pickerTrackers[i]);
+            }
+
+            this.Controls.Add(grpTrackers);
+            y += grpTrackerH + 10;
+
+            // ── Measurement Path ──────────────────────────────────
+            var grpPaths = new GroupBox
+            {
+                Text = "Measurement Path",
+                Left = lx,
+                Top = y,
+                Width = 806,
+                Height = 100,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
             lstPaths = new ListView
             {
                 Left = 8,
                 Top = 18,
-                Width = 688,
-                Height = 78,
+                Width = 706,
+                Height = 68,
                 View = View.Details,
                 FullRowSelect = true,
                 GridLines = true,
                 Font = new Font("Consolas", 8),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            lstPaths.Columns.Add("Path Name", 670);
+            lstPaths.Columns.Add("Path Name", 690);
             grpPaths.Controls.Add(lstPaths);
 
             btnPickPaths = new Button
             {
                 Text = "Pick",
-                Left = 704,
+                Left = 722,
                 Top = 18,
                 Width = 74,
                 Height = 28,
@@ -172,7 +226,7 @@ namespace ConstellationAddon
             btnClearPaths = new Button
             {
                 Text = "Clear",
-                Left = 704,
+                Left = 722,
                 Top = 52,
                 Width = 74,
                 Height = 28,
@@ -184,118 +238,64 @@ namespace ConstellationAddon
             btnClearPaths.Click += (s, e) => { _paths.Clear(); lstPaths.Items.Clear(); };
             grpPaths.Controls.Add(btnClearPaths);
             this.Controls.Add(grpPaths);
-            y += 120;
+            y += 110;
 
-            // ── Collision Objects ─────────────────────────────────
+            // ── Collision Pair ────────────────────────────────────
             var grpCollision = new GroupBox
             {
-                Text = "Collision Objects (select in PS, then click Set)",
+                Text = "Collision Pair (from PS Collision Viewer)",
                 Left = lx,
                 Top = y,
-                Width = 785,
-                Height = 52,
+                Width = 806,
+                Height = 56,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            btnSetCollision = new Button
+            grpCollision.Controls.Add(new Label
             {
-                Text = "Set from Selection",
+                Text = "Pair:",
                 Left = 8,
-                Top = 16,
-                Width = 150,
-                Height = 26,
-                BackColor = Color.FromArgb(0, 100, 180),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat
-            };
-            btnSetCollision.Click += OnSetCollisionClick;
-            grpCollision.Controls.Add(btnSetCollision);
-
-            lblCollisionCount = new Label
-            {
-                Text = "No objects selected",
-                Left = 168,
-                Top = 18,
-                Width = 400,
-                Height = 22,
-                TextAlign = ContentAlignment.MiddleLeft,
-                ForeColor = Color.Gray
-            };
-            grpCollision.Controls.Add(lblCollisionCount);
-            this.Controls.Add(grpCollision);
-            y += 62;
-
-            // ── MP Feature JSON ───────────────────────────────────
-            var grpJson = new GroupBox
-            {
-                Text = "MP Feature JSON (from Excel import)",
-                Left = lx,
-                Top = y,
-                Width = 785,
-                Height = 80,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-
-            txtJsonPath = new TextBox
-            {
-                Left = 8,
-                Top = 18,
-                Width = 580,
+                Top = 20,
+                Width = 40,
                 Height = 24,
-                ReadOnly = true,
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            cmbCollisionPair = new ComboBox
+            {
+                Left = 52,
+                Top = 20,
+                Width = 620,
+                Height = 24,
+                DropDownStyle = ComboBoxStyle.DropDownList,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            grpJson.Controls.Add(txtJsonPath);
+            cmbCollisionPair.Items.Add("(none — skip collision check)");
+            cmbCollisionPair.SelectedIndex = 0;
+            grpCollision.Controls.Add(cmbCollisionPair);
 
-            btnBrowseJson = new Button
+            var btnRefreshPairs = new Button
             {
-                Text = "Browse...",
-                Left = 596,
-                Top = 16,
-                Width = 80,
+                Text = "Refresh",
+                Left = 680,
+                Top = 18,
+                Width = 74,
                 Height = 26,
                 BackColor = Color.FromArgb(80, 80, 80),
                 ForeColor = Color.White,
                 FlatStyle = FlatStyle.Flat,
                 Anchor = AnchorStyles.Top | AnchorStyles.Right
             };
-            btnBrowseJson.Click += OnBrowseJsonClick;
-            grpJson.Controls.Add(btnBrowseJson);
+            btnRefreshPairs.Click += OnRefreshPairsClick;
+            grpCollision.Controls.Add(btnRefreshPairs);
+            this.Controls.Add(grpCollision);
+            y += 62;
 
-            btnImportExcel = new Button
+            // ── Analyze button ────────────────────────────────────
+            btnAnalyze = new Button
             {
-                Text = "Import from Excel...",
-                Left = 684,
-                Top = 16,
-                Width = 92,
-                Height = 26,
-                BackColor = Color.FromArgb(0, 120, 0),
-                ForeColor = Color.White,
-                FlatStyle = FlatStyle.Flat,
-                Anchor = AnchorStyles.Top | AnchorStyles.Right
-            };
-            btnImportExcel.Click += OnImportExcelClick;
-            grpJson.Controls.Add(btnImportExcel);
-
-            grpJson.Controls.Add(new Label
-            {
-                Text = "JSON provides MP feature types and allowed TCP rotation ranges (Aiming Guidelines).",
-                Left = 8,
-                Top = 50,
-                Width = 760,
-                Height = 20,
-                ForeColor = Color.Gray,
-                Font = new Font("Segoe UI", 7.5f, FontStyle.Italic)
-            });
-            this.Controls.Add(grpJson);
-            y += 90;
-
-            // ── Run button ────────────────────────────────────────
-            btnRun = new Button
-            {
-                Text = "Run Constellation Check",
+                Text = "Analyze",
                 Left = lx,
                 Top = y,
-                Width = 785,
+                Width = 806,
                 Height = 36,
                 BackColor = Color.FromArgb(180, 0, 0),
                 ForeColor = Color.White,
@@ -303,8 +303,8 @@ namespace ConstellationAddon
                 Font = new Font("Segoe UI", 10, FontStyle.Bold),
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
-            btnRun.Click += OnRun;
-            this.Controls.Add(btnRun);
+            btnAnalyze.Click += OnAnalyze;
+            this.Controls.Add(btnAnalyze);
             y += 44;
 
             // ── Results ───────────────────────────────────────────
@@ -313,7 +313,7 @@ namespace ConstellationAddon
                 Text = "Results",
                 Left = lx,
                 Top = y,
-                Width = 785,
+                Width = 806,
                 Height = this.Height - y - 50,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
                          AnchorStyles.Right | AnchorStyles.Bottom
@@ -327,10 +327,12 @@ namespace ConstellationAddon
                 Font = new Font("Consolas", 8)
             };
             lstResults.Columns.Add("Location", 160);
-            lstResults.Columns.Add("Status", 80);
-            lstResults.Columns.Add("Plane", 60);
+            lstResults.Columns.Add("Status", 70);
+            lstResults.Columns.Add("Tracker", 70);
+            lstResults.Columns.Add("Plane", 55);
             lstResults.Columns.Add("Visible LEDs", 90);
-            lstResults.Columns.Add("Details", 350);
+            lstResults.Columns.Add("Details", 300);
+            lstResults.MouseClick += OnResultsMouseClick;
             grpResults.Controls.Add(lstResults);
             this.Controls.Add(grpResults);
         }
@@ -383,84 +385,44 @@ namespace ConstellationAddon
                 }
                 var compound = obj as ITxCompoundOperation;
                 if (compound != null)
-                {
-                    var children = compound.GetAllDescendants(
-                        new TxTypeFilter(typeof(TxWeldOperation)));
-                    AddPathsFromSelection(children);
-                }
+                    AddPathsFromSelection(compound.GetAllDescendants(
+                        new TxTypeFilter(typeof(TxWeldOperation))));
             }
         }
 
-        // ── Collision objects ─────────────────────────────────────
+        // ── Collision Pair refresh ────────────────────────────────
 
-        private void OnSetCollisionClick(object sender, EventArgs e)
+        private void OnRefreshPairsClick(object sender, EventArgs e)
         {
-            _collisionObjects = RobotCollisionCheck.GetCollisionObjectsFromSelection();
-            lblCollisionCount.Text = string.Format(
-                "{0} object(s) set for collision check", _collisionObjects.Count);
-            lblCollisionCount.ForeColor = _collisionObjects.Count > 0
-                ? Color.DarkGreen : Color.Gray;
-        }
-
-        // ── JSON / Excel ──────────────────────────────────────────
-
-        private void OnBrowseJsonClick(object sender, EventArgs e)
-        {
-            using (var dlg = new OpenFileDialog())
+            Cursor = Cursors.WaitCursor;
+            try
             {
-                dlg.Filter = "JSON files|*.json|All files|*.*";
-                dlg.Title = "Select MP Feature JSON file";
-                if (dlg.ShowDialog() == DialogResult.OK)
-                    txtJsonPath.Text = dlg.FileName;
+                cmbCollisionPair.Items.Clear();
+                cmbCollisionPair.Items.Add("(none — skip collision check)");
+
+                var pairs = CollisionPairReader.GetActivePairs();
+                foreach (var pair in pairs)
+                    cmbCollisionPair.Items.Add(pair);
+
+                cmbCollisionPair.DisplayMember = "Name";
+                cmbCollisionPair.SelectedIndex = 0;
+
+                if (pairs.Count == 0)
+                    MessageBox.Show(
+                        "No active collision pairs found in PS Collision Viewer.",
+                        "No Pairs", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
-        }
-
-        private void OnImportExcelClick(object sender, EventArgs e)
-        {
-            string excelPath;
-            using (var dlg = new OpenFileDialog())
+            finally
             {
-                dlg.Filter = "Excel files|*.xls;*.xlsx|All files|*.*";
-                dlg.Title = "Select MP Excel file";
-                if (dlg.ShowDialog() != DialogResult.OK) return;
-                excelPath = dlg.FileName;
-            }
-
-            string jsonPath;
-            using (var dlg = new SaveFileDialog())
-            {
-                dlg.Filter = "JSON files|*.json";
-                dlg.Title = "Save MP Feature JSON as";
-                dlg.FileName = "mp_features.json";
-                if (dlg.ShowDialog() != DialogResult.OK) return;
-                jsonPath = dlg.FileName;
-            }
-
-            var result = MpFeatureExcelImporter.Import(excelPath, jsonPath);
-
-            if (result.Success)
-            {
-                txtJsonPath.Text = jsonPath;
-                string msg = string.Format(
-                    "Import successful.\n{0} levels imported, {1} rows skipped.",
-                    result.LevelCount, result.SkippedCount);
-                if (result.Warnings.Count > 0)
-                    msg += "\n\nWarnings:\n" + string.Join("\n", result.Warnings);
-                MessageBox.Show(msg, "Import Complete",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-            else
-            {
-                MessageBox.Show("Import failed: " + result.ErrorMessage,
-                    "Import Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Cursor = Cursors.Default;
             }
         }
 
-        // ── Run ───────────────────────────────────────────────────
+        // ── Analyze ───────────────────────────────────────────────
 
-        private void OnRun(object sender, EventArgs e)
+        private void OnAnalyze(object sender, EventArgs e)
         {
-            // Validate inputs
+            // Validate robot
             var robot = pickerRobot.Object as TxRobot;
             if (robot == null)
             {
@@ -468,106 +430,234 @@ namespace ConstellationAddon
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
-
-            var trackerComp = pickerTracker.Object as ITxLocatableObject;
-            if (trackerComp == null)
+            // Validate sensor holder
+            string selectedTypeId = cmbHolderType.SelectedItem as string;
+            if (string.IsNullOrEmpty(selectedTypeId))
             {
-                MessageBox.Show("Please select a Tracker.", "Missing Input",
+                MessageBox.Show("Please select a Sensor Holder type.", "Missing Input",
+                    MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            // Collect trackers (at least one required)
+            var trackers = new List<ITxLocatableObject>();
+            for (int i = 0; i < TrackerCount; i++)
+            {
+                var t = pickerTrackers[i].Object as ITxLocatableObject;
+                if (t != null) trackers.Add(t);
+            }
+
+            if (trackers.Count == 0)
+            {
+                MessageBox.Show("Please select at least one Tracker.", "Missing Input",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
             if (_paths.Count == 0)
             {
-                MessageBox.Show("Please select at least one path.", "Missing Input",
+                MessageBox.Show("Please select a path.", "Missing Input",
                     MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
             }
 
-            // Clean up previous visualization
+            // Get selected collision pair (null = skip)
+            var selectedPair = cmbCollisionPair.SelectedItem as TxCollisionPair;
+
+            // Cleanup previous results
             ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
             lstResults.Items.Clear();
 
-            // Tracker world transform
-            TxTransformation trackerWorld = trackerComp.AbsoluteLocation;
-            ITracker tracker = new Tracker920_0005();
-
-            // MP feature lookup (optional — JSON may not be loaded)
-            MpFeatureLookup featureLookup = null;
-            if (!string.IsNullOrEmpty(txtJsonPath.Text) && File.Exists(txtJsonPath.Text))
-            {
-                try { featureLookup = MpFeatureLookup.LoadFromJson(txtJsonPath.Text); }
-                catch { /* proceed without feature lookup */ }
-            }
-
-            // Run path checker
-            var checker = new ConstellationPathChecker(
-                robot, tracker, trackerWorld, _collisionObjects);
+            ITracker trackerDef = new Tracker920_0005();
+            var followMode = new TxOlpRobotFollowMode(robot);
 
             foreach (var path in _paths)
             {
-                ConstellationPathResult pathResult;
-                try
+                TxObjectList locations = path.GetAllDescendants(
+                    new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
+
+                foreach (ITxObject obj in locations)
                 {
-                    pathResult = checker.CheckPath(path, _visComponents);
-                }
-                catch (Exception ex)
-                {
-                    lstResults.Items.Add(new ListViewItem(new[]
+                    var loc = obj as ITxRoboticLocationOperation;
+                    if (loc == null) continue;
+
+                    // 1. Jump
+                    bool reached = followMode.JumpRobotToLocation(loc);
+                    TxApplication.RefreshDisplay();
+
+                    if (!reached)
                     {
-                        path.Name, "ERROR", "", "", ex.Message
-                    })
-                    { ForeColor = Color.Red });
-                    continue;
-                }
+                        AddResultRow(loc.Name, "SKIPPED", "", "", "",
+                            "Robot could not reach location", Color.Gray);
+                        continue;
+                    }
 
-                foreach (var pt in pathResult.PointResults)
-                {
-                    string status = pt.HasCollision ? "COLLISION" :
-                                     !pt.RobotReached ? "SKIPPED" :
-                                     pt.Criteria != null && pt.Criteria.IsOk ? "OK" : "NOK";
-
-                    string plane = pt.Criteria != null && pt.Criteria.SatisfiedPlane != null
-                                     ? pt.Criteria.SatisfiedPlane : "";
-
-                    string visible = pt.Visibility != null
-                                     ? pt.Visibility.TotalVisibleCount.ToString()
-                                     : "";
-
-                    string details = pt.Label ?? "";
-
-                    var item = new ListViewItem(new[]
+                    // 2. Collision check via PS Collision Pair
+                    if (selectedPair != null)
                     {
-                        pt.LocationName, status, plane, visible, details
-                    });
+                        bool hasCollision =
+                            CollisionPairReader.CheckCollisionWithPair(selectedPair);
+                        if (hasCollision)
+                        {
+                            AddResultRow(loc.Name, "COLLISION", "", "", "",
+                                "Collision detected", Color.OrangeRed);
+                            continue;
+                        }
+                    }
 
-                    item.ForeColor = status == "OK" ? Color.DarkGreen :
-                                     status == "NOK" ? Color.DarkRed :
-                                     status == "COLLISION" ? Color.OrangeRed :
-                                                            Color.Gray;
+                    // 3. Sensor holder — position from robot TCPF (holder self origin = flansch)
+         
+                    ISensorHolder holder = CreateHolderInstance(selectedTypeId);
 
-                    lstResults.Items.Add(item);
+                    if (holder == null || robot.TCPF == null)
+                    {
+                        AddResultRow(loc.Name, "SKIPPED", "", "", "",
+                            "Sensor holder or TCPF not available", Color.Gray);
+                        continue;
+                    }
+
+                    // holderLoc = TCPF — holder self origin coincides with robot flange
+                    ITxLocatableObject holderLoc = robot.TCPF;
+
+                    // 4. Try each tracker — first OK wins
+                    bool anyOk = false;
+
+                    for (int t = 0; t < trackers.Count; t++)
+                    {
+                        TxTransformation trackerWorld = trackers[t].AbsoluteLocation;
+
+                        var visibility = ConstellationVisibilityChecker.Check(
+                            holderLoc, holder, trackerWorld, trackerDef,
+                            _visComponents);
+                        // debug
+                        if (lstResults.Items.Count == 0 && t == 0)
+                        {
+                            var emitters = holder.GetEmitters();
+                            string info = string.Format(
+                                "TCPF world pos: X={0:F1} Y={1:F1} Z={2:F1}\n" +
+                                "First emitter world pos: X={3:F1} Y={4:F1} Z={5:F1}\n" +
+                                "Tracker world pos: X={6:F1} Y={7:F1} Z={8:F1}\n" +
+                                "Visible LEDs: {9}",
+                                robot.TCPF.AbsoluteLocation.Translation.X,
+                                robot.TCPF.AbsoluteLocation.Translation.Y,
+                                robot.TCPF.AbsoluteLocation.Translation.Z,
+                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).X,
+                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).Y,
+                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).Z,
+                                trackers[0].AbsoluteLocation.Translation.X,
+                                trackers[0].AbsoluteLocation.Translation.Y,
+                                trackers[0].AbsoluteLocation.Translation.Z,
+                                visibility.TotalVisibleCount);
+                            MessageBox.Show(info, "Debug Positions");
+                        }
+                        // debug end
+                        var criteria = ConstellationCriteriaEngine.Evaluate(visibility);
+
+                        string trackerLabel = string.Format("T{0}", t + 1);
+
+                        if (criteria.IsOk)
+                        {
+                            AddResultRow(
+                                loc.Name, "OK", trackerLabel,
+                                criteria.SatisfiedPlane ?? "",
+                                visibility.TotalVisibleCount.ToString(),
+                                criteria.Label,
+                                Color.DarkGreen);
+                            anyOk = true;
+                            break;
+                        }
+
+                        // Last tracker also NOK
+                        if (t == trackers.Count - 1)
+                        {
+                            AddResultRow(
+                                loc.Name, "NOK", trackerLabel,  // volt "all"
+                                "",
+                                visibility.TotalVisibleCount.ToString(),
+                                "No tracker satisfies criteria",
+                                Color.DarkRed);
+                        }
+                    }
                 }
             }
 
             // Summary
-            int ok = 0; int nok = 0; int skip = 0; int coll = 0;
+            int ok = 0, nok = 0, coll = 0, skip = 0;
             foreach (ListViewItem item in lstResults.Items)
             {
                 switch (item.SubItems[1].Text)
                 {
                     case "OK": ok++; break;
                     case "NOK": nok++; break;
-                    case "SKIPPED": skip++; break;
                     case "COLLISION": coll++; break;
+                    case "SKIPPED": skip++; break;
                 }
             }
 
             MessageBox.Show(
                 string.Format("Done.\nOK: {0}  NOK: {1}  Collision: {2}  Skipped: {3}",
                     ok, nok, coll, skip),
-                "Constellation Check Complete",
+                "Analysis Complete",
                 MessageBoxButtons.OK, MessageBoxIcon.Information);
+        }
+
+        // ── Jump to location on row click ─────────────────────────
+
+        private void OnResultsMouseClick(object sender, MouseEventArgs e)
+        {
+            var hit = lstResults.HitTest(e.Location);
+            var item = hit.Item;
+            if (item == null) return;
+
+            string locationName = item.SubItems[0].Text;
+            if (string.IsNullOrEmpty(locationName)) return;
+
+            var robot = pickerRobot.Object as TxRobot;
+            if (robot == null) return;
+
+            var followMode = new TxOlpRobotFollowMode(robot);
+
+            foreach (var path in _paths)
+            {
+                TxObjectList locations = path.GetAllDescendants(
+                    new TxTypeFilter(typeof(ITxRoboticLocationOperation)));
+
+                foreach (ITxObject obj in locations)
+                {
+                    var loc = obj as ITxRoboticLocationOperation;
+                    if (loc == null || loc.Name != locationName) continue;
+
+                    followMode.JumpRobotToLocation(loc);
+
+                    var sel = new TxObjectList();
+                    sel.Add(loc);
+                    TxApplication.ActiveSelection.SetItems(sel);
+                    TxApplication.RefreshDisplay();
+                    return;
+                }
+            }
+        }
+
+        // ── Helpers ───────────────────────────────────────────────
+
+        private void AddResultRow(
+            string location, string status, string tracker,
+            string plane, string visLeds, string details, Color color)
+        {
+            var item = new ListViewItem(new[]
+            {
+                location, status, tracker, plane, visLeds, details
+            });
+            item.ForeColor = color;
+            lstResults.Items.Add(item);
+        }
+
+        private static ISensorHolder CreateHolderInstance(string typeId)
+        {
+            if (string.IsNullOrEmpty(typeId)) return null;
+            if (typeId == "perc_01-03944-10")
+                return new SensorHolder_Perc_01_03944_10();
+            return null;
         }
 
         // ── Cleanup ───────────────────────────────────────────────
