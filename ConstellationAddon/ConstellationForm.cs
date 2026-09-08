@@ -10,6 +10,7 @@ using Tecnomatix.Engineering;
 using Tecnomatix.Engineering.Olp.OLP_Utilities;
 using Tecnomatix.Engineering.OLP;
 using Tecnomatix.Engineering.Ui;
+using ISRA.Calculations.AccuSite;
 
 namespace ConstellationAddon
 {
@@ -25,6 +26,8 @@ namespace ConstellationAddon
         private ComboBox cmbCollisionPair;
         private Button btnAnalyze;
         private ListView lstResults;
+        private TabControl tabResults;
+        private ListView lstAngleDetails;
 
         // ── State ─────────────────────────────────────────────────
         private readonly List<TxWeldOperation> _paths
@@ -307,7 +310,7 @@ namespace ConstellationAddon
             this.Controls.Add(btnAnalyze);
             y += 44;
 
-            // ── Results ───────────────────────────────────────────
+            // ── Results TabControl ────────────────────────────────
             var grpResults = new GroupBox
             {
                 Text = "Results",
@@ -318,6 +321,14 @@ namespace ConstellationAddon
                 Anchor = AnchorStyles.Top | AnchorStyles.Left |
                          AnchorStyles.Right | AnchorStyles.Bottom
             };
+
+            tabResults = new TabControl
+            {
+                Dock = DockStyle.Fill
+            };
+
+            // Tab 1: Results
+            var tabSummary = new TabPage { Text = "Results" };
             lstResults = new ListView
             {
                 Dock = DockStyle.Fill,
@@ -333,7 +344,31 @@ namespace ConstellationAddon
             lstResults.Columns.Add("Visible LEDs", 90);
             lstResults.Columns.Add("Details", 300);
             lstResults.MouseClick += OnResultsMouseClick;
-            grpResults.Controls.Add(lstResults);
+            tabSummary.Controls.Add(lstResults);
+
+            // Tab 2: Angle Details
+            var tabAngles = new TabPage { Text = "Angle Details" };
+            lstAngleDetails = new ListView
+            {
+                Dock = DockStyle.Fill,
+                View = View.Details,
+                FullRowSelect = true,
+                GridLines = true,
+                Font = new Font("Consolas", 8)
+            };
+            lstAngleDetails.Columns.Add("Location", 130);
+            lstAngleDetails.Columns.Add("Group", 60);
+            lstAngleDetails.Columns.Add("Emitter", 130);
+            lstAngleDetails.Columns.Add("Cam1 (°)", 70);
+            lstAngleDetails.Columns.Add("Cam2 (°)", 70);
+            lstAngleDetails.Columns.Add("Cam3 (°)", 70);
+            lstAngleDetails.Columns.Add("FOV", 50);
+            lstAngleDetails.Columns.Add("Status", 80);
+            tabAngles.Controls.Add(lstAngleDetails);
+
+            tabResults.TabPages.Add(tabSummary);
+            tabResults.TabPages.Add(tabAngles);
+            grpResults.Controls.Add(tabResults);
             this.Controls.Add(grpResults);
         }
 
@@ -516,8 +551,8 @@ namespace ConstellationAddon
                         continue;
                     }
 
-                    // holderLoc = TCPF — holder self origin coincides with robot flange
-                    ITxLocatableObject holderLoc = robot.TCPF;
+                    // holderLoc = Toolframe — holder self origin coincides with robot flange
+                    ITxLocatableObject holderLoc = robot.Toolframe;
 
                     // 4. Try each tracker — first OK wins
                     bool anyOk = false;
@@ -529,30 +564,50 @@ namespace ConstellationAddon
                         var visibility = ConstellationVisibilityChecker.Check(
                             holderLoc, holder, trackerWorld, trackerDef,
                             _visComponents);
-                        // debug
-                        if (lstResults.Items.Count == 0 && t == 0)
-                        {
-                            var emitters = holder.GetEmitters();
-                            string info = string.Format(
-                                "TCPF world pos: X={0:F1} Y={1:F1} Z={2:F1}\n" +
-                                "First emitter world pos: X={3:F1} Y={4:F1} Z={5:F1}\n" +
-                                "Tracker world pos: X={6:F1} Y={7:F1} Z={8:F1}\n" +
-                                "Visible LEDs: {9}",
-                                robot.TCPF.AbsoluteLocation.Translation.X,
-                                robot.TCPF.AbsoluteLocation.Translation.Y,
-                                robot.TCPF.AbsoluteLocation.Translation.Z,
-                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).X,
-                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).Y,
-                                holder.GetEmitterWorldPosition(robot.TCPF, emitters[0]).Z,
-                                trackers[0].AbsoluteLocation.Translation.X,
-                                trackers[0].AbsoluteLocation.Translation.Y,
-                                trackers[0].AbsoluteLocation.Translation.Z,
-                                visibility.TotalVisibleCount);
-                            MessageBox.Show(info, "Debug Positions");
-                        }
-                        // debug end
-                        var criteria = ConstellationCriteriaEngine.Evaluate(visibility);
 
+                        // Angle visualization in PS
+                        ConstellationVisibilityChecker.CreateAngleVisualization(
+                            holderLoc, holder, trackerWorld, trackerDef,
+                            visibility.AngleResults, _visComponents);
+
+                        // Fill Angle Details tab
+                        var emitters = holder.GetEmitters();
+                        for (int ei = 0; ei < emitters.Length; ei++)
+                        {
+                            if (visibility.AngleResults == null) continue;
+
+                            double a1 = visibility.AngleResults[ei, 0].AngleDeg;
+                            double a2 = visibility.AngleResults[ei, 1].AngleDeg;
+                            double a3 = visibility.AngleResults[ei, 2].AngleDeg;
+
+                            bool inFov = !double.IsNaN(a1);
+                            bool allOk = inFov &&
+                                         visibility.AngleResults[ei, 0].PassedAngle &&
+                                         visibility.AngleResults[ei, 1].PassedAngle &&
+                                         visibility.AngleResults[ei, 2].PassedAngle;
+
+                            string fmt1 = double.IsNaN(a1) ? "-" : string.Format("{0:F1}", a1);
+                            string fmt2 = double.IsNaN(a2) ? "-" : string.Format("{0:F1}", a2);
+                            string fmt3 = double.IsNaN(a3) ? "-" : string.Format("{0:F1}", a3);
+
+                            var detailItem = new ListViewItem(new[]
+                            {
+                                loc.Name,
+                                emitters[ei].Group,
+                                emitters[ei].Name,
+                                fmt1, fmt2, fmt3,
+                                inFov ? "YES" : "NO",
+                                allOk ? "OK" : (inFov ? "NOK" : "FOV")
+                            });
+
+                            detailItem.ForeColor = allOk ? Color.DarkGreen :
+                                                   !inFov ? Color.Gray :
+                                                            Color.DarkRed;
+                            lstAngleDetails.Items.Add(detailItem);
+                        }
+
+                        // Evaluate criteria
+                        var criteria = ConstellationCriteriaEngine.Evaluate(visibility);
                         string trackerLabel = string.Format("T{0}", t + 1);
 
                         if (criteria.IsOk)
@@ -564,15 +619,14 @@ namespace ConstellationAddon
                                 criteria.Label,
                                 Color.DarkGreen);
                             anyOk = true;
-                            break;
+                            break; // first OK tracker is enough
                         }
 
-                        // Last tracker also NOK
                         if (t == trackers.Count - 1)
                         {
+                            // Last tracker also NOK
                             AddResultRow(
-                                loc.Name, "NOK", trackerLabel,  // volt "all"
-                                "",
+                                loc.Name, "NOK", trackerLabel, "",
                                 visibility.TotalVisibleCount.ToString(),
                                 "No tracker satisfies criteria",
                                 Color.DarkRed);

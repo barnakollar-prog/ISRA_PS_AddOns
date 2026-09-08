@@ -6,21 +6,11 @@ using ISRA.Components.AccuSite.Trackers;
 
 namespace ISRA.Calculations.AccuSite
 {
-    /// <summary>
-    /// Result of constellation visibility check for a single measurement point.
-    /// </summary>
     public class ConstellationVisibilityResult
     {
-        /// <summary>All 40 emitter angle results (emitter x camera)</summary>
         public EmitterCameraAngleResult[,] AngleResults { get; set; }
-
-        /// <summary>Emitters that passed angle check AND line-of-sight (max ~12)</summary>
         public List<VisibleEmitterResult> VisibleEmitters { get; set; }
-
-        /// <summary>Group name → visible emitter count in that group</summary>
         public Dictionary<string, int> VisibleCountPerGroup { get; set; }
-
-        /// <summary>Total visible emitter count across all groups</summary>
         public int TotalVisibleCount { get; set; }
     }
 
@@ -39,30 +29,17 @@ namespace ISRA.Calculations.AccuSite
         public string Group { get; set; }
         public TxVector WorldPos { get; set; }
         public TxVector WorldZVec { get; set; }
-        /// <summary>Which cameras have clear line-of-sight to this emitter</summary>
         public List<string> VisibleFromCameras { get; set; }
     }
 
-    /// <summary>
-    /// Checks which LEDs of a sensor holder constellation are visible
-    /// from a tracker at a given measurement point.
-    ///
-    /// Phase 1 — angle filter (all 40 LEDs, no PS geometry)
-    /// Phase 2 — line-of-sight collision check (angle candidates only, ~12 max, no display)
-    /// Phase 3 — visualization: 12x12mm green square at each visible LED frame
-    /// </summary>
     public static class ConstellationVisibilityChecker
     {
         private const double DefaultMaxAngleDeg = 40.0;
         private const double CylinderRadius = 5.0;
-        private const double LedSquareHalfSize = 6.0; // 12x12mm → ±6mm
+        private const double LedSquareHalfSize = 6.0;
 
         // ── Public entry point ────────────────────────────────────
 
-        /// <summary>
-        /// Runs all three phases and returns the visibility result.
-        /// Visualization components are added to visComponents for later cleanup.
-        /// </summary>
         public static ConstellationVisibilityResult Check(
             ITxLocatableObject holderLoc,
             ISensorHolder holder,
@@ -74,21 +51,18 @@ namespace ISRA.Calculations.AccuSite
             var emitters = holder.GetEmitters();
             var cameras = tracker.GetCameras();
 
-            // ── Phase 1: angle filter ─────────────────────────────
             var angleResults = RunAngleFilter(
                 holderLoc, holder, emitters, trackerWorld, tracker, cameras, maxAngleDeg);
 
-            // Collect candidates: emitters that pass angle check for at least 1 camera
-            var candidates = GetAngleCandidates(holderLoc, holder, emitters, angleResults, cameras);
+            var candidates = GetAngleCandidates(
+                holderLoc, holder, emitters, angleResults, cameras);
 
-            // ── Phase 2: line-of-sight collision ──────────────────
-            var visibleEmitters = RunLineOfSightFilter(candidates, trackerWorld, tracker, cameras);
+            var visibleEmitters = RunLineOfSightFilter(
+                candidates, trackerWorld, tracker, cameras);
 
-            // ── Phase 3: visualization ────────────────────────────
             foreach (var vis in visibleEmitters)
                 CreateLedSquare(vis.WorldPos, vis.WorldZVec, visComponents);
 
-            // ── Aggregate results ─────────────────────────────────
             var visibleCountPerGroup = new Dictionary<string, int>();
             foreach (var vis in visibleEmitters)
             {
@@ -110,18 +84,17 @@ namespace ISRA.Calculations.AccuSite
 
         private static EmitterCameraAngleResult[,] RunAngleFilter(
             ITxLocatableObject holderLoc,
-    ISensorHolder holder,
-    SensorEmitterData[] emitters,
-    TxTransformation trackerWorld,
-    ITracker tracker,
-    CameraData[] cameras,
-    double maxAngleDeg)
+            ISensorHolder holder,
+            SensorEmitterData[] emitters,
+            TxTransformation trackerWorld,
+            ITracker tracker,
+            CameraData[] cameras,
+            double maxAngleDeg)
         {
-            int eCount = emitters.Length; // 40
-            int cCount = cameras.Length;  // 3
+            int eCount = emitters.Length;
+            int cCount = cameras.Length;
             var results = new EmitterCameraAngleResult[eCount, cCount];
 
-            // Precompute tracker inverse for FOV checks
             TxTransformation trackerInverse = trackerWorld.Inverse;
 
             for (int e = 0; e < eCount; e++)
@@ -129,7 +102,6 @@ namespace ISRA.Calculations.AccuSite
                 TxVector emitterWorldPos = holder.GetEmitterWorldPosition(holderLoc, emitters[e]);
                 TxVector emitterWorldZ = holder.GetEmitterWorldZVector(holderLoc, emitters[e]);
 
-                // FOV check — transform emitter to tracker local space
                 TxVector emitterLocalPos = trackerInverse.Transform(emitterWorldPos);
                 bool inFov = tracker.IsInFOV(emitterLocalPos);
 
@@ -150,7 +122,7 @@ namespace ISRA.Calculations.AccuSite
 
                     TxVector cameraWorldPos = tracker.GetCameraWorldPosition(trackerWorld, cameras[c]);
                     double angle = GeometryCalculations.CalculateEmitterAngle(
-                                                emitterWorldPos, emitterWorldZ, cameraWorldPos);
+                        emitterWorldPos, emitterWorldZ, cameraWorldPos);
 
                     results[e, c] = new EmitterCameraAngleResult
                     {
@@ -166,7 +138,6 @@ namespace ISRA.Calculations.AccuSite
             return results;
         }
 
-        // Collect emitters that passed angle for ≥1 camera, with world coords
         private static List<(SensorEmitterData emitter, TxVector worldPos, TxVector worldZ, List<string> candidateCameras)>
             GetAngleCandidates(
                 ITxLocatableObject holderLoc,
@@ -204,9 +175,7 @@ namespace ISRA.Calculations.AccuSite
             CameraData[] cameras)
         {
             var visible = new List<VisibleEmitterResult>();
-
-            // Build scene object list once (reuse for all cylinders)
-            TxObjectList sceneList = BuildSceneList();
+            var sceneList = BuildSceneList();
 
             foreach (var (emitter, worldPos, worldZ, candidateCameras) in candidates)
             {
@@ -214,14 +183,12 @@ namespace ISRA.Calculations.AccuSite
 
                 foreach (var cameraName in candidateCameras)
                 {
-                    // Find camera
                     CameraData cam = null;
                     foreach (var c in cameras)
                         if (c.Name == cameraName) { cam = c; break; }
                     if (cam == null) continue;
 
                     TxVector cameraWorldPos = tracker.GetCameraWorldPosition(trackerWorld, cam);
-
                     bool blocked = CheckLineOfSight(cameraWorldPos, worldPos, sceneList);
                     if (!blocked)
                         clearCameras.Add(cameraName);
@@ -248,13 +215,11 @@ namespace ISRA.Calculations.AccuSite
             TxVector emitterWorldPos,
             TxObjectList sceneList)
         {
-            // Direction from camera to emitter, normalized
             TxVector dir = Normalize(new TxVector(
                 emitterWorldPos.X - cameraWorldPos.X,
                 emitterWorldPos.Y - cameraWorldPos.Y,
                 emitterWorldPos.Z - cameraWorldPos.Z));
 
-            // 10mm offsets to avoid self-collision
             TxVector camOffset = new TxVector(
                 cameraWorldPos.X + dir.X * 10.0,
                 cameraWorldPos.Y + dir.Y * 10.0,
@@ -286,18 +251,12 @@ namespace ISRA.Calculations.AccuSite
                     ReportLevel = TxCollisionQueryParams.TxCollisionReportLevel.ComponentLevel
                 };
 
-                bool blocked = TxApplication.ActiveDocument.CollisionRoot
+                return TxApplication.ActiveDocument.CollisionRoot
                     .HasCollidingObjectsFromLists(cylList, sceneList, queryParams);
-
-                return blocked;
             }
-            catch
-            {
-                return false; // assume clear on error
-            }
+            catch { return false; }
             finally
             {
-                // Always delete — no display
                 try { cylComp?.Delete(); } catch { }
             }
         }
@@ -321,12 +280,8 @@ namespace ISRA.Calculations.AccuSite
             return sceneList;
         }
 
-        // ── Phase 3: visualization ────────────────────────────────
+        // ── Phase 3: LED square visualization ────────────────────
 
-        /// <summary>
-        /// Creates a 12x12mm green square in world space, centered at worldPos,
-        /// oriented so its normal = worldZVec (square plane ⊥ emission direction).
-        /// </summary>
         private static void CreateLedSquare(
             TxVector worldPos,
             TxVector worldZVec,
@@ -334,12 +289,10 @@ namespace ISRA.Calculations.AccuSite
         {
             try
             {
-                // Build local coordinate frame: Z = emission direction
                 TxVector zAxis = Normalize(worldZVec);
                 TxVector xAxis = GetPerpendicularVector(zAxis);
                 TxVector yAxis = Cross(zAxis, xAxis);
 
-                // 4 corners of 12x12mm square
                 TxVector c1 = Offset(worldPos, xAxis, LedSquareHalfSize, yAxis, LedSquareHalfSize);
                 TxVector c2 = Offset(worldPos, xAxis, -LedSquareHalfSize, yAxis, LedSquareHalfSize);
                 TxVector c3 = Offset(worldPos, xAxis, -LedSquareHalfSize, yAxis, -LedSquareHalfSize);
@@ -363,6 +316,79 @@ namespace ISRA.Calculations.AccuSite
             catch { }
         }
 
+        // ── Angle visualization ───────────────────────────────────
+
+        public static void CreateAngleVisualization(
+            ITxLocatableObject holderLoc,
+            ISensorHolder holder,
+            TxTransformation trackerWorld,
+            ITracker tracker,
+            EmitterCameraAngleResult[,] angleResults,
+            List<TxComponent> visComponents,
+            double maxAngleDeg = 40.0)
+        {
+            var emitters = holder.GetEmitters();
+            var cameras = tracker.GetCameras();
+
+            TxTransformation identity = new TxTransformation();
+            TxColor green = new TxColor(0, 220, 0);
+            TxColor red = new TxColor(220, 0, 0);
+            TxColor gray = new TxColor(150, 150, 150);
+
+            try
+            {
+                var compData = new TxLocalComponentCreationData("_CONST_ANGLE_vis");
+                var comp = TxApplication.ActiveDocument.PhysicalRoot
+                    .CreateLocalComponent(compData);
+
+                for (int e = 0; e < emitters.Length; e++)
+                {
+                    TxVector emitterWorldPos = holder.GetEmitterWorldPosition(
+                        holderLoc, emitters[e]);
+
+                    for (int c = 0; c < cameras.Length; c++)
+                    {
+                        TxVector cameraWorldPos = tracker.GetCameraWorldPosition(
+                            trackerWorld, cameras[c]);
+
+                        var result = angleResults[e, c];
+
+                        TxColor lineColor;
+                        if (double.IsNaN(result.AngleDeg))
+                            lineColor = gray;
+                        else if (result.PassedAngle)
+                            lineColor = green;
+                        else
+                            lineColor = red;
+
+                        string lineName = string.Format("_{0}_{1}",
+                            emitters[e].Name, cameras[c].Name);
+
+                        var line = comp.CreateLine(
+                            new TxLineCreationData(lineName, identity,
+                                cameraWorldPos, emitterWorldPos));
+                        line.Color = lineColor;
+                    }
+                }
+
+                TxApplication.RefreshDisplay();
+                visComponents.Add(comp);
+            }
+            catch { }
+        }
+
+        // ── Cleanup ───────────────────────────────────────────────
+
+        public static void DeleteVisualizations(List<TxComponent> visComponents)
+        {
+            foreach (var comp in visComponents)
+            {
+                try { if (comp != null && comp.IsValid()) comp.Delete(); } catch { }
+            }
+            visComponents.Clear();
+            TxApplication.RefreshDisplay();
+        }
+
         // ── Vector helpers ────────────────────────────────────────
 
         private static TxVector Normalize(TxVector v)
@@ -380,7 +406,6 @@ namespace ISRA.Calculations.AccuSite
                 a.X * b.Y - a.Y * b.X);
         }
 
-        /// <summary>Returns an arbitrary vector perpendicular to v.</summary>
         private static TxVector GetPerpendicularVector(TxVector v)
         {
             TxVector candidate = Math.Abs(v.X) < 0.9
@@ -400,16 +425,5 @@ namespace ISRA.Calculations.AccuSite
                 origin.Z + ax.Z * ax_scale + ay.Z * ay_scale);
         }
 
-        // ── Cleanup ───────────────────────────────────────────────
-
-        public static void DeleteVisualizations(List<TxComponent> visComponents)
-        {
-            foreach (var comp in visComponents)
-            {
-                try { if (comp != null && comp.IsValid()) comp.Delete(); } catch { }
-            }
-            visComponents.Clear();
-            TxApplication.RefreshDisplay();
-        }
-    }
-} 
+    } // end class ConstellationVisibilityChecker
+} // end namespace
