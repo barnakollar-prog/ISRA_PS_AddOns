@@ -2,6 +2,7 @@
 using Tecnomatix.Engineering;
 using ISRA.Components.AccuSite.Stars;
 using ISRA.Components.AccuSite.Trackers;
+using ISRA.Core.Utilities;
 
 namespace ISRA.Calculations.AccuSite
 {
@@ -100,7 +101,7 @@ namespace ISRA.Calculations.AccuSite
         public static StarEmitterVisibilityResult CheckStarEmitterVisibility(
             ITxLocatableObject starLoc,
             TxTransformation trackerWorld,
-            double maxAngleDeg = 40.0)
+            double maxAngleDeg = AccuSiteConstants.EmitterMaxAngleDeg)
         {
             var emitters = star_515_0139.GetEmitters();
             var cameras = tracker_920_0005.GetCameras();
