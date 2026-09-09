@@ -43,11 +43,11 @@ namespace ISRA.Calculations.AccuSite
 
         public static ConstellationVisibilityResult Check(
             ITxLocatableObject holderLoc,
-            ISensorHolder holder,
-            TxTransformation trackerWorld,
-            ITracker tracker,
-            List<TxComponent> visComponents,
-            double maxAngleDeg = DefaultMaxAngleDeg)
+    ISensorHolder holder,
+    TxTransformation trackerWorld,
+    ITracker tracker,
+    List<TxComponent> visComponents,
+    double maxAngleDeg = DefaultMaxAngleDeg)
         {
             var emitters = holder.GetEmitters();
             var cameras = tracker.GetCameras();
@@ -61,8 +61,7 @@ namespace ISRA.Calculations.AccuSite
             var visibleEmitters = RunLineOfSightFilter(
                 candidates, trackerWorld, tracker, cameras);
 
-            foreach (var vis in visibleEmitters)
-                CreateLedSquare(vis.WorldPos, vis.WorldZVec, visComponents);
+            // ← CreateLedSquare hívás TÖRÖLVE — vizualizáció a form felelőssége
 
             var visibleCountPerGroup = new Dictionary<string, int>();
             foreach (var vis in visibleEmitters)
@@ -283,7 +282,7 @@ namespace ISRA.Calculations.AccuSite
 
         // ── Phase 3: LED square visualization ────────────────────
 
-        private static void CreateLedSquare(
+        public static void CreateLedSquare(
             TxVector worldPos,
             TxVector worldZVec,
             List<TxComponent> visComponents)

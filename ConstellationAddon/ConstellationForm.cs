@@ -35,7 +35,13 @@ namespace ConstellationAddon
         private List<TxComponent> _visComponents
             = new List<TxComponent>();
         private bool _pickingPaths = false;
-        
+        private readonly Dictionary<string, ConstellationVisibilityResult> _pointVisibility
+    = new Dictionary<string, ConstellationVisibilityResult>();
+        private readonly Dictionary<string, string> _pointTrackerLabel
+            = new Dictionary<string, string>();
+        private List<TxComponent> _currentPointVis
+            = new List<TxComponent>();
+
 
         // ── Configuration — change to scale up ───────────────────
         private const int TrackerCount = 4;  // → 8 when needed
@@ -501,7 +507,11 @@ namespace ConstellationAddon
 
             // Cleanup previous results
             ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
+            ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
             lstResults.Items.Clear();
+            lstAngleDetails.Items.Clear();
+            _pointVisibility.Clear();
+            _pointTrackerLabel.Clear();
 
             ITracker trackerDef = new Tracker920_0005();
             var followMode = new TxOlpRobotFollowMode(robot);
@@ -561,14 +571,16 @@ namespace ConstellationAddon
                     {
                         TxTransformation trackerWorld = trackers[t].AbsoluteLocation;
 
+                        // Üres temp lista — nem jelenítünk meg semmit analízis közben
+                        var tempVis = new List<TxComponent>();
+
                         var visibility = ConstellationVisibilityChecker.Check(
                             holderLoc, holder, trackerWorld, trackerDef,
-                            _visComponents);
+                            tempVis);
 
-                        // Angle visualization in PS
-                        ConstellationVisibilityChecker.CreateAngleVisualization(
-                            holderLoc, holder, trackerWorld, trackerDef,
-                            visibility.AngleResults, _visComponents);
+                        // Tárold az eredményt pontonként
+                        _pointVisibility[loc.Name] = visibility;
+                        _pointTrackerLabel[loc.Name] = string.Format("T{0}", t + 1);
 
                         // Fill Angle Details tab
                         var emitters = holder.GetEmitters();
@@ -619,12 +631,11 @@ namespace ConstellationAddon
                                 criteria.Label,
                                 Color.DarkGreen);
                             anyOk = true;
-                            break; // first OK tracker is enough
+                            break;
                         }
 
                         if (t == trackers.Count - 1)
                         {
-                            // Last tracker also NOK
                             AddResultRow(
                                 loc.Name, "NOK", trackerLabel, "",
                                 visibility.TotalVisibleCount.ToString(),
@@ -669,8 +680,11 @@ namespace ConstellationAddon
             var robot = pickerRobot.Object as TxRobot;
             if (robot == null) return;
 
-            var followMode = new TxOlpRobotFollowMode(robot);
+            // 1. Töröld az előző pont vizualizációját
+            ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
 
+            // 2. Ugorj a pontba
+            var followMode = new TxOlpRobotFollowMode(robot);
             foreach (var path in _paths)
             {
                 TxObjectList locations = path.GetAllDescendants(
@@ -687,9 +701,51 @@ namespace ConstellationAddon
                     sel.Add(loc);
                     TxApplication.ActiveSelection.SetItems(sel);
                     TxApplication.RefreshDisplay();
-                    return;
+                    goto pointFound;
                 }
             }
+        pointFound:
+
+            // 3. Rajzold ki a tárolt eredményből a vizualizációt
+            if (!_pointVisibility.ContainsKey(locationName)) return;
+
+            var visibility = _pointVisibility[locationName];
+            string selectedTypeId = cmbHolderType.SelectedItem as string;
+            ISensorHolder holder = CreateHolderInstance(selectedTypeId);
+            if (holder == null || robot.Toolframe == null) return;
+
+            ITxLocatableObject holderLoc = robot.Toolframe;
+
+            // Tracker world — az eltárolt tracker label alapján
+            string trackerLabel = _pointTrackerLabel.ContainsKey(locationName)
+                ? _pointTrackerLabel[locationName] : "T1";
+            int trackerIdx = 0;
+            if (trackerLabel.Length > 1)
+                int.TryParse(trackerLabel.Substring(1), out trackerIdx);
+            trackerIdx = Math.Max(1, trackerIdx) - 1;
+
+            var trackers = new List<ITxLocatableObject>();
+            for (int i = 0; i < TrackerCount; i++)
+            {
+                var t = pickerTrackers[i].Object as ITxLocatableObject;
+                if (t != null) trackers.Add(t);
+            }
+
+            if (trackerIdx >= trackers.Count) trackerIdx = 0;
+            TxTransformation trackerWorld = trackers[trackerIdx].AbsoluteLocation;
+            ITracker trackerDef = new Tracker920_0005();
+
+            // Zöld négyzetek
+            foreach (var vis in visibility.VisibleEmitters)
+                ConstellationVisibilityChecker.CreateLedSquare(
+                    vis.WorldPos, vis.WorldZVec, _currentPointVis);
+
+            // Vonalak
+            ConstellationVisibilityChecker.CreateAngleVisualization(
+                holderLoc, holder, trackerWorld, trackerDef,
+                visibility.AngleResults, _currentPointVis);
+
+            TxApplication.RefreshDisplay();
         }
 
         // ── Helpers ───────────────────────────────────────────────
@@ -723,6 +779,7 @@ namespace ConstellationAddon
                 TxApplication.ActiveSelection.ItemsSet -= OnSelectionChanged;
                 TxApplication.ActiveSelection.ItemsAdded -= OnSelectionAdded;
                 ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
+                ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
             }
             catch { }
         }
