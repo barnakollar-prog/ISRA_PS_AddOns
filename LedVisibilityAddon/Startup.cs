@@ -8,6 +8,7 @@ using Tecnomatix.Engineering.DataTypes.Graphics;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Components.AccuSite.Stars;
 using ISRA.Calculations.AccuSite;
+using ISRA.Core.Utilities;
 using LedVisibilityAddon.Presentation;
 
 namespace LedVisibilityAddon
@@ -255,7 +256,7 @@ namespace LedVisibilityAddon
                 Height = rowH,
                 Minimum = 1,
                 Maximum = 90,
-                Value = 40,
+                Value = (decimal)AccuSiteConstants.EmitterMaxAngleDeg,
                 DecimalPlaces = 0
             };
             grpSettings.Controls.Add(nudMaxAngle);

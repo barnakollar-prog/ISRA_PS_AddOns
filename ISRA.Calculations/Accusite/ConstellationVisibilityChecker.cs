@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Tecnomatix.Engineering;
 using ISRA.Components.AccuSite.SensorHolders;
 using ISRA.Components.AccuSite.Trackers;
+using ISRA.Core.Utilities;
 
 namespace ISRA.Calculations.AccuSite
 {
@@ -34,7 +35,7 @@ namespace ISRA.Calculations.AccuSite
 
     public static class ConstellationVisibilityChecker
     {
-        private const double DefaultMaxAngleDeg = 40.0;
+        private const double DefaultMaxAngleDeg = AccuSiteConstants.EmitterMaxAngleDeg;
         private const double CylinderRadius = 5.0;
         private const double LedSquareHalfSize = 6.0;
 
