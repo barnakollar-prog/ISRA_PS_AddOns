@@ -27,7 +27,7 @@ namespace ConstellationAddon
         private Button btnAnalyze;
         private ListView lstResults;
         private TabControl tabResults;
-        private ListView lstAngleDetails;
+        private TreeView treeAngleDetails;
 
         // ── State ─────────────────────────────────────────────────
         private readonly List<TxWeldOperation> _paths
@@ -356,23 +356,16 @@ namespace ConstellationAddon
 
             // Tab 2: Angle Details
             var tabAngles = new TabPage { Text = "Angle Details" };
-            lstAngleDetails = new ListView
+            treeAngleDetails = new TreeView
             {
                 Dock = DockStyle.Fill,
-                View = View.Details,
-                FullRowSelect = true,
-                GridLines = true,
-                Font = new Font("Consolas", 8)
+                Font = new Font("Consolas", 8),
+                ShowLines = true,
+                ShowPlusMinus = true,
+                FullRowSelect = true
             };
-            lstAngleDetails.Columns.Add("Location", 130);
-            lstAngleDetails.Columns.Add("Group", 60);
-            lstAngleDetails.Columns.Add("Emitter", 130);
-            lstAngleDetails.Columns.Add("Cam1 (°)", 70);
-            lstAngleDetails.Columns.Add("Cam2 (°)", 70);
-            lstAngleDetails.Columns.Add("Cam3 (°)", 70);
-            lstAngleDetails.Columns.Add("FOV", 50);
-            lstAngleDetails.Columns.Add("Status", 80);
-            tabAngles.Controls.Add(lstAngleDetails);
+            tabAngles.Controls.Add(treeAngleDetails);
+
 
             tabResults.TabPages.Add(tabSummary);
             tabResults.TabPages.Add(tabAngles);
@@ -512,7 +505,7 @@ namespace ConstellationAddon
             ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
             ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
             lstResults.Items.Clear();
-            lstAngleDetails.Items.Clear();
+            treeAngleDetails.Nodes.Clear();
             _pointVisibility.Clear();
             _pointTrackerLabel.Clear();
 
@@ -585,7 +578,20 @@ namespace ConstellationAddon
                         _pointVisibility[loc.Name] = visibility;
                         _pointTrackerLabel[loc.Name] = string.Format("T{0}", t + 1);
 
-                        // Fill Angle Details tab
+                        // Fill Angle Details tab — egy főnode per pont, alatta emitterek
+                        TreeNode pointNode = null;
+
+                        // Keresd meg vagy hozd létre a pont node-ját
+                        foreach (TreeNode n in treeAngleDetails.Nodes)
+                        {
+                            if (n.Text == loc.Name) { pointNode = n; break; }
+                        }
+                        if (pointNode == null)
+                        {
+                            pointNode = new TreeNode(loc.Name);
+                            treeAngleDetails.Nodes.Add(pointNode);
+                        }
+
                         var emitters = holder.GetEmitters();
                         for (int ei = 0; ei < emitters.Length; ei++)
                         {
@@ -605,20 +611,19 @@ namespace ConstellationAddon
                             string fmt2 = double.IsNaN(a2) ? "-" : string.Format("{0:F1}", a2);
                             string fmt3 = double.IsNaN(a3) ? "-" : string.Format("{0:F1}", a3);
 
-                            var detailItem = new ListViewItem(new[]
-                            {
-                                loc.Name,
+                            string nodeText = string.Format(
+                                "{0} | {1} | Cam1:{2} Cam2:{3} Cam3:{4} | FOV:{5} | {6}",
                                 emitters[ei].Group,
                                 emitters[ei].Name,
                                 fmt1, fmt2, fmt3,
                                 inFov ? "YES" : "NO",
-                                allOk ? "OK" : (inFov ? "NOK" : "FOV")
-                            });
+                                allOk ? "OK" : (inFov ? "NOK" : "FOV"));
 
-                            detailItem.ForeColor = allOk ? Color.DarkGreen :
-                                                   !inFov ? Color.Gray :
-                                                            Color.DarkRed;
-                            lstAngleDetails.Items.Add(detailItem);
+                            var emitterNode = new TreeNode(nodeText);
+                            emitterNode.ForeColor = allOk ? Color.DarkGreen :
+                                                    !inFov ? Color.Gray :
+                                                             Color.DarkRed;
+                            pointNode.Nodes.Add(emitterNode);
                         }
 
                         // Evaluate criteria
