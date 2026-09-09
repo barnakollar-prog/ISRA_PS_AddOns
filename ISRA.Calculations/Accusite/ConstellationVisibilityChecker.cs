@@ -13,6 +13,15 @@ namespace ISRA.Calculations.AccuSite
         public List<VisibleEmitterResult> VisibleEmitters { get; set; }
         public Dictionary<string, int> VisibleCountPerGroup { get; set; }
         public int TotalVisibleCount { get; set; }
+        /// <summary>True if constellation is within tracker FOV.</summary>
+        public bool IsInFov { get; set; }
+
+        /// <summary>
+        /// True if LOS is blocked enough to prevent sufficient emitter visibility,
+        /// even though angle filter would have passed enough emitters.
+        /// N/A (null) if angle filter itself was insufficient.
+        /// </summary>
+        public bool? IsSightBlocked { get; set; }
     }
 
     public class EmitterCameraAngleResult
@@ -42,7 +51,7 @@ namespace ISRA.Calculations.AccuSite
         // ── Public entry point ────────────────────────────────────
 
         public static ConstellationVisibilityResult Check(
-            ITxLocatableObject holderLoc,
+    ITxLocatableObject holderLoc,
     ISensorHolder holder,
     TxTransformation trackerWorld,
     ITracker tracker,
@@ -61,8 +70,41 @@ namespace ISRA.Calculations.AccuSite
             var visibleEmitters = RunLineOfSightFilter(
                 candidates, trackerWorld, tracker, cameras);
 
-            // ← CreateLedSquare hívás TÖRÖLVE — vizualizáció a form felelőssége
+            // ── FOV check ─────────────────────────────────────────────
+            // True if at least one emitter is inside the tracker FOV
+            bool isInFov = false;
+            TxTransformation trackerInverse = trackerWorld.Inverse;
+            foreach (var emitter in emitters)
+            {
+                TxVector emitterLocalPos = trackerInverse.Transform(
+                    holder.GetEmitterWorldPosition(holderLoc, emitter));
+                if (tracker.IsInFOV(emitterLocalPos)) { isInFov = true; break; }
+            }
 
+            // ── Sight check ───────────────────────────────────────────
+            // How many emitters pass angle filter from ALL cameras
+            int anglePassCount = 0;
+            for (int e = 0; e < emitters.Length; e++)
+            {
+                bool allCamsOk = true;
+                for (int c = 0; c < cameras.Length; c++)
+                    if (!angleResults[e, c].PassedAngle) { allCamsOk = false; break; }
+                if (allCamsOk) anglePassCount++;
+            }
+
+            bool angleWouldBeOk = anglePassCount >= 3;
+            bool visibleOk = visibleEmitters.Count >= 3;
+
+            // null  = angle filter itself was insufficient (N/A)
+            // true  = angle OK but LOS blocks enough to fail
+            // false = angle OK and LOS OK
+            bool? isSightBlocked = null;
+            if (angleWouldBeOk && !visibleOk)
+                isSightBlocked = true;
+            else if (angleWouldBeOk && visibleOk)
+                isSightBlocked = false;
+
+            // ── Visible count per group ───────────────────────────────
             var visibleCountPerGroup = new Dictionary<string, int>();
             foreach (var vis in visibleEmitters)
             {
@@ -76,7 +118,9 @@ namespace ISRA.Calculations.AccuSite
                 AngleResults = angleResults,
                 VisibleEmitters = visibleEmitters,
                 VisibleCountPerGroup = visibleCountPerGroup,
-                TotalVisibleCount = visibleEmitters.Count
+                TotalVisibleCount = visibleEmitters.Count,
+                IsInFov = isInFov,
+                IsSightBlocked = isSightBlocked
             };
         }
 

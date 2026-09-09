@@ -348,7 +348,9 @@ namespace ConstellationAddon
             lstResults.Columns.Add("Tracker", 70);
             lstResults.Columns.Add("Plane", 55);
             lstResults.Columns.Add("Visible LEDs", 90);
-            lstResults.Columns.Add("Details", 300);
+            lstResults.Columns.Add("Details", 200);
+            lstResults.Columns.Add("FOV", 50);
+            lstResults.Columns.Add("Sight", 55);
             lstResults.MouseClick += OnResultsMouseClick;
             tabSummary.Controls.Add(lstResults);
 
@@ -376,6 +378,7 @@ namespace ConstellationAddon
             tabResults.TabPages.Add(tabAngles);
             grpResults.Controls.Add(tabResults);
             this.Controls.Add(grpResults);
+
         }
 
         // ── Path picking ──────────────────────────────────────────
@@ -533,7 +536,7 @@ namespace ConstellationAddon
                     if (!reached)
                     {
                         AddResultRow(loc.Name, "SKIPPED", "", "", "",
-                            "Robot could not reach location", Color.Gray);
+                            "Robot could not reach location", "", "", Color.Gray);
                         continue;
                     }
 
@@ -545,7 +548,7 @@ namespace ConstellationAddon
                         if (hasCollision)
                         {
                             AddResultRow(loc.Name, "COLLISION", "", "", "",
-                                "Collision detected", Color.OrangeRed);
+                                "Collision detected", "", "", Color.OrangeRed);
                             continue;
                         }
                     }
@@ -557,7 +560,7 @@ namespace ConstellationAddon
                     if (holder == null || robot.TCPF == null)
                     {
                         AddResultRow(loc.Name, "SKIPPED", "", "", "",
-                            "Sensor holder or TCPF not available", Color.Gray);
+                            "No recognized sensor holder mounted", "", "", Color.Gray);
                         continue;
                     }
 
@@ -624,11 +627,16 @@ namespace ConstellationAddon
 
                         if (criteria.IsOk)
                         {
+                            string fov = visibility.IsInFov ? "YES" : "NO";
+                            string sight = visibility.IsSightBlocked == null ? "N/A" :
+                                           visibility.IsSightBlocked == true ? "NOK" : "OK";
+
                             AddResultRow(
                                 loc.Name, "OK", trackerLabel,
                                 criteria.SatisfiedPlane ?? "",
                                 visibility.TotalVisibleCount.ToString(),
                                 criteria.Label,
+                                fov, sight,
                                 Color.DarkGreen);
                             anyOk = true;
                             break;
@@ -636,10 +644,15 @@ namespace ConstellationAddon
 
                         if (t == trackers.Count - 1)
                         {
+                            string fov = visibility.IsInFov ? "YES" : "NO";
+                            string sight = visibility.IsSightBlocked == null ? "N/A" :
+                                           visibility.IsSightBlocked == true ? "NOK" : "OK";
+
                             AddResultRow(
                                 loc.Name, "NOK", trackerLabel, "",
                                 visibility.TotalVisibleCount.ToString(),
                                 "No tracker satisfies criteria",
+                                fov, sight,
                                 Color.DarkRed);
                         }
                     }
@@ -752,14 +765,15 @@ namespace ConstellationAddon
 
         private void AddResultRow(
             string location, string status, string tracker,
-            string plane, string visLeds, string details, Color color)
+            string plane, string visLeds, string details,
+            string fov, string sight, Color color)
         {
-            var item = new ListViewItem(new[]
-            {
-                location, status, tracker, plane, visLeds, details
-            });
-            item.ForeColor = color;
-            lstResults.Items.Add(item);
+                    var item = new ListViewItem(new[]
+                    {
+                         location, status, tracker, plane, visLeds, details, fov, sight
+                    });
+                    item.ForeColor = color;
+                    lstResults.Items.Add(item);
         }
 
         private static ISensorHolder CreateHolderInstance(string typeId)
