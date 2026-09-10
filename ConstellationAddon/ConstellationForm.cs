@@ -28,6 +28,10 @@ namespace ConstellationAddon
         private ListView lstResults;
         private TabControl tabResults;
         private TreeView treeAngleDetails;
+        private CheckBox chkShowOkLines;
+        private CheckBox chkShowNokLines;
+        private CheckBox chkShowFovLines;
+        private string _currentPointName = null;
 
         // ── State ─────────────────────────────────────────────────
         private readonly List<TxWeldOperation> _paths
@@ -315,6 +319,55 @@ namespace ConstellationAddon
             btnAnalyze.Click += OnAnalyze;
             this.Controls.Add(btnAnalyze);
             y += 44;
+
+            // ── Visualization filter ──────────────────────────────
+            var pnlVisFilter = new Panel
+            {
+                Left = lx,
+                Top = y,
+                Width = 806,
+                Height = 30,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            chkShowOkLines = new CheckBox
+            {
+                Text = "Show OK lines (green)",
+                Left = 0,
+                Top = 6,
+                Width = 185,
+                Height = 20,
+                Checked = true
+            };
+            chkShowOkLines.CheckedChanged += OnVisFilterChanged;
+            pnlVisFilter.Controls.Add(chkShowOkLines);
+
+            chkShowNokLines = new CheckBox
+            {
+                Text = "Show NOK lines (red)",
+                Left = 200,
+                Top = 6,
+                Width = 180,
+                Height = 20,
+                Checked = true
+            };
+            chkShowNokLines.CheckedChanged += OnVisFilterChanged;
+            pnlVisFilter.Controls.Add(chkShowNokLines);
+
+            chkShowFovLines = new CheckBox
+            {
+                Text = "Show FOV outside (gray)",
+                Left = 400,
+                Top = 6,
+                Width = 200,
+                Height = 20,
+                Checked = false
+            };
+            chkShowFovLines.CheckedChanged += OnVisFilterChanged;
+            pnlVisFilter.Controls.Add(chkShowFovLines);
+
+            this.Controls.Add(pnlVisFilter);
+            y += 32;
 
             // ── Results TabControl ────────────────────────────────
             var grpResults = new GroupBox
@@ -731,46 +784,9 @@ namespace ConstellationAddon
             }
         pointFound:
 
-            // 3. Rajzold ki a tárolt eredményből a vizualizációt
-            if (!_pointVisibility.ContainsKey(locationName)) return;
-
-            var visibility = _pointVisibility[locationName];
-            string selectedTypeId = cmbHolderType.SelectedItem as string;
-            ISensorHolder holder = CreateHolderInstance(selectedTypeId);
-            if (holder == null || robot.Toolframe == null) return;
-
-            ITxLocatableObject holderLoc = robot.Toolframe;
-
-            // Tracker world — az eltárolt tracker label alapján
-            string trackerLabel = _pointTrackerLabel.ContainsKey(locationName)
-                ? _pointTrackerLabel[locationName] : "T1";
-            int trackerIdx = 0;
-            if (trackerLabel.Length > 1)
-                int.TryParse(trackerLabel.Substring(1), out trackerIdx);
-            trackerIdx = Math.Max(1, trackerIdx) - 1;
-
-            var trackers = new List<ITxLocatableObject>();
-            for (int i = 0; i < TrackerCount; i++)
-            {
-                var t = pickerTrackers[i].Object as ITxLocatableObject;
-                if (t != null) trackers.Add(t);
-            }
-
-            if (trackerIdx >= trackers.Count) trackerIdx = 0;
-            TxTransformation trackerWorld = trackers[trackerIdx].AbsoluteLocation;
-            ITracker trackerDef = new Tracker920_0005();
-
-            // Zöld négyzetek
-            foreach (var vis in visibility.VisibleEmitters)
-                ConstellationVisibilityChecker.CreateLedSquare(
-                    vis.WorldPos, vis.WorldZVec, _currentPointVis);
-
-            // Vonalak
-            ConstellationVisibilityChecker.CreateAngleVisualization(
-                holderLoc, holder, trackerWorld, trackerDef,
-                visibility.AngleResults, _currentPointVis);
-
-            TxApplication.RefreshDisplay();
+            // Tárold a jelenlegi pont nevét és rajzold újra a szűrőkkel
+            _currentPointName = locationName;
+            RedrawCurrentPointVisualization();
         }
 
         // ── Helpers ───────────────────────────────────────────────
@@ -811,6 +827,60 @@ namespace ConstellationAddon
                 return new SensorHolder_Perc_01_03944_10();
             return null;
         }
+        private void OnVisFilterChanged(object sender, EventArgs e)
+        {
+            // Ha van kiválasztott pont, újrarajzoljuk a vonalakat
+            if (_currentPointName == null) return;
+            RedrawCurrentPointVisualization();
+        }
+        private void RedrawCurrentPointVisualization()
+        {
+            if (_currentPointName == null) return;
+            if (!_pointVisibility.ContainsKey(_currentPointName)) return;
+
+            // ← robot a pickerből
+            var robot = pickerRobot.Object as TxRobot;
+            if (robot == null) return;
+
+            ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
+
+            var visibility = _pointVisibility[_currentPointName];
+            string selectedTypeId = cmbHolderType.SelectedItem as string;
+            ISensorHolder holder = CreateHolderInstance(selectedTypeId);
+            if (holder == null || robot.Toolframe == null) return;
+
+            string trackerLabel = _pointTrackerLabel.ContainsKey(_currentPointName)
+                ? _pointTrackerLabel[_currentPointName] : "T1";
+            int trackerIdx = 0;
+            if (trackerLabel.Length > 1)
+                int.TryParse(trackerLabel.Substring(1), out trackerIdx);
+            trackerIdx = Math.Max(1, trackerIdx) - 1;
+
+            var trackerList = new List<ITxLocatableObject>();
+            for (int i = 0; i < TrackerCount; i++)
+            {
+                var t = pickerTrackers[i].Object as ITxLocatableObject;
+                if (t != null) trackerList.Add(t);
+            }
+            if (trackerIdx >= trackerList.Count) trackerIdx = 0;
+
+            TxTransformation trackerWorld = trackerList[trackerIdx].AbsoluteLocation;
+            ITracker trackerDef = new Tracker920_0005();
+            ITxLocatableObject holderLoc = robot.Toolframe;
+
+            foreach (var vis in visibility.VisibleEmitters)
+                ConstellationVisibilityChecker.CreateLedSquare(
+                    vis.WorldPos, vis.WorldZVec, _currentPointVis);
+
+            ConstellationVisibilityChecker.CreateAngleVisualizationFiltered(
+                holderLoc, holder, trackerWorld, trackerDef,
+                visibility.AngleResults, _currentPointVis,
+                chkShowOkLines.Checked,
+                chkShowNokLines.Checked,
+                chkShowFovLines.Checked);
+
+            TxApplication.RefreshDisplay();
+        }
 
         // ── Cleanup ───────────────────────────────────────────────
 
@@ -822,6 +892,7 @@ namespace ConstellationAddon
                 TxApplication.ActiveSelection.ItemsAdded -= OnSelectionAdded;
                 ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
                 ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
+                _currentPointName = null;
             }
             catch { }
         }

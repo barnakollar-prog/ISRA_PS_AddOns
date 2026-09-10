@@ -421,6 +421,81 @@ namespace ISRA.Calculations.AccuSite
             catch { }
         }
 
+        public static void CreateAngleVisualizationFiltered(
+    ITxLocatableObject holderLoc,
+    ISensorHolder holder,
+    TxTransformation trackerWorld,
+    ITracker tracker,
+    EmitterCameraAngleResult[,] angleResults,
+    List<TxComponent> visComponents,
+    bool showOk,
+    bool showNok,
+    bool showFov,
+    double maxAngleDeg = 40.0)
+        {
+            var emitters = holder.GetEmitters();
+            var cameras = tracker.GetCameras();
+
+            TxTransformation identity = new TxTransformation();
+            TxColor green = new TxColor(0, 220, 0);
+            TxColor red = new TxColor(220, 0, 0);
+            TxColor gray = new TxColor(150, 150, 150);
+
+            try
+            {
+                var compData = new TxLocalComponentCreationData("_CONST_ANGLE_vis");
+                var comp = TxApplication.ActiveDocument.PhysicalRoot
+                    .CreateLocalComponent(compData);
+
+                bool anyLine = false;
+
+                for (int e = 0; e < emitters.Length; e++)
+                {
+                    TxVector emitterWorldPos = holder.GetEmitterWorldPosition(
+                        holderLoc, emitters[e]);
+
+                    for (int c = 0; c < cameras.Length; c++)
+                    {
+                        TxVector cameraWorldPos = tracker.GetCameraWorldPosition(
+                            trackerWorld, cameras[c]);
+
+                        var result = angleResults[e, c];
+
+                        bool isFov = double.IsNaN(result.AngleDeg);
+                        bool isOk = !isFov && result.PassedAngle;
+                        bool isNok = !isFov && !result.PassedAngle;
+
+                        // Filter
+                        if (isFov && !showFov) continue;
+                        if (isOk && !showOk) continue;
+                        if (isNok && !showNok) continue;
+
+                        TxColor lineColor = isFov ? gray : isOk ? green : red;
+
+                        string lineName = string.Format("_{0}_{1}",
+                            emitters[e].Name, cameras[c].Name);
+
+                        var line = comp.CreateLine(
+                            new TxLineCreationData(lineName, identity,
+                                cameraWorldPos, emitterWorldPos));
+                        line.Color = lineColor;
+                        anyLine = true;
+                    }
+                }
+
+                if (anyLine)
+                {
+                    TxApplication.RefreshDisplay();
+                    visComponents.Add(comp);
+                }
+                else
+                {
+                    comp.Delete();
+                }
+            }
+            catch { }
+        }
+
         // ── Cleanup ───────────────────────────────────────────────
 
         public static void DeleteVisualizations(List<TxComponent> visComponents)
