@@ -24,6 +24,7 @@ namespace ConstellationAddon
         private ListView lstPaths;
         private Button btnPickPaths;
         private Button btnClearPaths;
+        private Button btnHelp;
         private ComboBox cmbCollisionPair;
         private Button btnAnalyze;
         private ListView lstResults;
@@ -346,6 +347,26 @@ namespace ConstellationAddon
             btnAnalyze.Click += OnAnalyze;
             this.Controls.Add(btnAnalyze);
             y += 44;
+            // ── Bottom button panel ───────────────────────────────
+            var pnlBottom = new Panel
+            {
+                Dock = DockStyle.Bottom,
+                Height = 36,
+                Padding = new Padding(lx, 4, lx, 4)
+            };
+            // Help/About button
+            btnHelp = new Button
+            {
+                Text = "Help / About",
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Segoe UI", 9)
+            };
+            btnHelp.Click += OnHelpAbout;
+            pnlBottom.Controls.Add(btnHelp);
+            this.Controls.Add(pnlBottom);
 
             // ── Visualization filter ──────────────────────────────
             var pnlVisFilter = new Panel
@@ -453,6 +474,8 @@ namespace ConstellationAddon
             this.Controls.Add(grpResults);
 
         }
+
+
 
         // ── Path picking ──────────────────────────────────────────
 
@@ -924,7 +947,10 @@ namespace ConstellationAddon
 
             TxApplication.RefreshDisplay();
         }
-
+        private void OnHelpAbout(object sender, EventArgs e)
+        {
+            HelpAbout.ShowAbout();
+        }
         // ── Cleanup ───────────────────────────────────────────────
 
         private void OnFormClosing(object sender, FormClosingEventArgs e)
