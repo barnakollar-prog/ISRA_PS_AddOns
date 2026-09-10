@@ -578,7 +578,7 @@ namespace ConstellationAddon
                         _pointVisibility[loc.Name] = visibility;
                         _pointTrackerLabel[loc.Name] = string.Format("T{0}", t + 1);
 
-                        // Fill Angle Details tab — egy főnode per pont, alatta emitterek
+                        // Fill Angle Details tab — egy főnode per pont, alatta emitterek (táblázatos formátum)
                         TreeNode pointNode = null;
 
                         // Keresd meg vagy hozd létre a pont node-ját
@@ -590,6 +590,12 @@ namespace ConstellationAddon
                         {
                             pointNode = new TreeNode(loc.Name);
                             treeAngleDetails.Nodes.Add(pointNode);
+
+                            var headerNode = new TreeNode(FormatAngleDetailRow(
+                                "Group", "Emitter", "Cam1", "Cam2", "Cam3", "FOV", "Status"));
+                            headerNode.ForeColor = Color.DimGray;
+                            headerNode.NodeFont = new Font(treeAngleDetails.Font, FontStyle.Bold);
+                            pointNode.Nodes.Add(headerNode);
                         }
 
                         var emitters = holder.GetEmitters();
@@ -611,8 +617,7 @@ namespace ConstellationAddon
                             string fmt2 = double.IsNaN(a2) ? "-" : string.Format("{0:F1}", a2);
                             string fmt3 = double.IsNaN(a3) ? "-" : string.Format("{0:F1}", a3);
 
-                            string nodeText = string.Format(
-                                "{0} | {1} | Cam1:{2} Cam2:{3} Cam3:{4} | FOV:{5} | {6}",
+                            string nodeText = FormatAngleDetailRow(
                                 emitters[ei].Group,
                                 emitters[ei].Name,
                                 fmt1, fmt2, fmt3,
@@ -643,6 +648,7 @@ namespace ConstellationAddon
                                 criteria.Label,
                                 fov, sight,
                                 Color.DarkGreen);
+                            pointNode.ForeColor = Color.DarkGreen;
                             anyOk = true;
                             break;
                         }
@@ -659,6 +665,7 @@ namespace ConstellationAddon
                                 "No tracker satisfies criteria",
                                 fov, sight,
                                 Color.DarkRed);
+                            pointNode.ForeColor = Color.DarkRed;
                         }
                     }
                 }
@@ -779,6 +786,22 @@ namespace ConstellationAddon
                     });
                     item.ForeColor = color;
                     lstResults.Items.Add(item);
+        }
+
+        // Fixed-width columns so rows line up under the Consolas font used by treeAngleDetails.
+        private static string FormatAngleDetailRow(
+            string group, string emitter, string cam1, string cam2, string cam3,
+            string fov, string status)
+        {
+            return string.Format(
+                "{0,-8} {1,-14} {2,7} {3,7} {4,7}   {5,-5} {6,-6}",
+                Truncate(group, 8), Truncate(emitter, 14), cam1, cam2, cam3, fov, status);
+        }
+
+        private static string Truncate(string value, int maxLength)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length <= maxLength) return value;
+            return value.Substring(0, maxLength);
         }
 
         private static ISensorHolder CreateHolderInstance(string typeId)
