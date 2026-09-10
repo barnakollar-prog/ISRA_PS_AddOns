@@ -20,6 +20,7 @@ namespace ConstellationAddon
         private TxObjEditBoxCtrl pickerRobot;
         private TxObjEditBoxCtrl[] pickerTrackers;
         private ComboBox cmbHolderType;
+        private TxObjEditBoxCtrl pickerSensorHolderComp;
         private ListView lstPaths;
         private Button btnPickPaths;
         private Button btnClearPaths;
@@ -111,13 +112,15 @@ namespace ConstellationAddon
             // ── Sensor Holder ─────────────────────────────────────
             var grpHolder = new GroupBox
             {
-                Text = "Sensor Holder Type",
+                Text = "Sensor Holder",
                 Left = lx,
                 Top = y,
                 Width = 806,
-                Height = 52,
+                Height = 80,
                 Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
             };
+
+            // Típus dropdown
             grpHolder.Controls.Add(new Label
             {
                 Text = "Type:",
@@ -141,8 +144,32 @@ namespace ConstellationAddon
             if (cmbHolderType.Items.Count > 0)
                 cmbHolderType.SelectedIndex = 0;
             grpHolder.Controls.Add(cmbHolderType);
+
+            // Komponens picker
+            grpHolder.Controls.Add(new Label
+            {
+                Text = "Component:",
+                Left = 8,
+                Top = 48,
+                Width = 80,
+                Height = 24,
+                TextAlign = ContentAlignment.MiddleLeft
+            });
+            pickerSensorHolderComp = new TxObjEditBoxCtrl
+            {
+                Left = 92,
+                Top = 48,
+                Width = 700,
+                Height = 24,
+                ValidatorType = TxValidatorType.Component,
+                PickLevel = TxPickLevel.Component,
+                PickOnly = false,
+                ListenToPick = true,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpHolder.Controls.Add(pickerSensorHolderComp);
             this.Controls.Add(grpHolder);
-            y += 62;
+            y += 90;
 
             // ── Trackers (2x2 grid, expandable to 4x2) ───────────
             int trackerRows = (int)Math.Ceiling((double)TrackerCount / TrackerCols);
@@ -599,19 +626,18 @@ namespace ConstellationAddon
                         }
                     }
 
-                    // 3. Sensor holder — position from robot TCPF (holder self origin = flansch)
-         
+                    // 3. Sensor holder
                     ISensorHolder holder = CreateHolderInstance(selectedTypeId);
 
-                    if (holder == null || robot.TCPF == null)
+                    if (holder == null)
                     {
                         AddResultRow(loc.Name, "SKIPPED", "", "", "",
-                            "No recognized sensor holder mounted", "", "", Color.Gray);
+                            "Sensor holder type not recognized", "", "", Color.Gray);
                         continue;
                     }
 
-                    // holderLoc = Toolframe — holder self origin coincides with robot flange
-                    ITxLocatableObject holderLoc = robot.Toolframe;
+                    // holderLoc 
+                    ITxLocatableObject holderLoc = pickerSensorHolderComp.Object as ITxLocatableObject; 
 
                     // 4. Try each tracker — first OK wins
                     bool anyOk = false;
@@ -842,6 +868,11 @@ namespace ConstellationAddon
             var robot = pickerRobot.Object as TxRobot;
             if (robot == null) return;
 
+            // ← Sensor holder komponens pozíciója — self origó
+            var holderComp = pickerSensorHolderComp.Object as ITxLocatableObject;
+            if (holderComp == null) return;
+            ITxLocatableObject holderLoc = holderComp; // ← ez váltja ki a robot.Toolframe-et
+
             ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
 
             var visibility = _pointVisibility[_currentPointName];
@@ -866,11 +897,23 @@ namespace ConstellationAddon
 
             TxTransformation trackerWorld = trackerList[trackerIdx].AbsoluteLocation;
             ITracker trackerDef = new Tracker920_0005();
-            ITxLocatableObject holderLoc = robot.Toolframe;
+         
 
-            foreach (var vis in visibility.VisibleEmitters)
+            var emitters = holder.GetEmitters();
+            foreach (var emitter in emitters)
+            {
+                // Csak a látható emitterekre
+                bool isVisible = false;
+                foreach (var vis in visibility.VisibleEmitters)
+                    if (vis.EmitterName == emitter.Name) { isVisible = true; break; }
+
+                if (!isVisible) continue;
+
+                TxVector worldPos = holder.GetEmitterWorldPosition(holderLoc, emitter);
+                TxVector worldZ = holder.GetEmitterWorldZVector(holderLoc, emitter);
                 ConstellationVisibilityChecker.CreateLedSquare(
-                    vis.WorldPos, vis.WorldZVec, _currentPointVis);
+                    worldPos, worldZ, _currentPointVis);
+            }
 
             ConstellationVisibilityChecker.CreateAngleVisualizationFiltered(
                 holderLoc, holder, trackerWorld, trackerDef,
