@@ -674,7 +674,7 @@ namespace ConstellationAddon
 
                         var visibility = ConstellationVisibilityChecker.Check(
                             holderLoc, holder, trackerWorld, trackerDef,
-                            tempVis);
+                            tempVis, robot);
 
                         // Tárold az eredményt pontonként
                         _pointVisibility[loc.Name] = visibility;

@@ -149,7 +149,7 @@ namespace ISRA.Calculations.AccuSite
                 // 4. Visibility check
                 var visibility = ConstellationVisibilityChecker.Check(
                     holderLoc, holder, _trackerWorld, _tracker,
-                    visComponents, _maxAngleDeg);
+                    visComponents, _robot);
 
                 // 5. Criteria
                 var criteria = ConstellationCriteriaEngine.Evaluate(visibility);

@@ -56,6 +56,7 @@ namespace ISRA.Calculations.AccuSite
     TxTransformation trackerWorld,
     ITracker tracker,
     List<TxComponent> visComponents,
+    TxRobot robot,
     double maxAngleDeg = DefaultMaxAngleDeg)
         {
             var emitters = holder.GetEmitters();
@@ -68,7 +69,7 @@ namespace ISRA.Calculations.AccuSite
                 holderLoc, holder, emitters, angleResults, cameras);
 
             var visibleEmitters = RunLineOfSightFilter(
-                candidates, trackerWorld, tracker, cameras);
+                candidates, trackerWorld, tracker, cameras, holderLoc, robot);
 
             // ── FOV check ─────────────────────────────────────────────
             // True if at least one emitter is inside the tracker FOV
@@ -213,13 +214,17 @@ namespace ISRA.Calculations.AccuSite
         // ── Phase 2: line-of-sight ────────────────────────────────
 
         private static List<VisibleEmitterResult> RunLineOfSightFilter(
-            List<(SensorEmitterData emitter, TxVector worldPos, TxVector worldZ, List<string> candidateCameras)> candidates,
+            List<(SensorEmitterData emitter, TxVector worldPos, TxVector worldZ,
+          List<string> candidateCameras)> candidates,
             TxTransformation trackerWorld,
             ITracker tracker,
-            CameraData[] cameras)
+            CameraData[] cameras,
+            ITxLocatableObject holderLoc,
+            TxRobot robot)
+
         {
             var visible = new List<VisibleEmitterResult>();
-            var sceneList = BuildSceneList();
+            var sceneList = BuildSceneList(holderLoc, robot);
 
             foreach (var (emitter, worldPos, worldZ, candidateCameras) in candidates)
             {
@@ -305,9 +310,14 @@ namespace ISRA.Calculations.AccuSite
             }
         }
 
-        private static TxObjectList BuildSceneList()
+        private static TxObjectList BuildSceneList(
+            ITxLocatableObject holderLoc,
+            TxRobot robot)
         {
             var sceneList = new TxObjectList();
+            string holderName = (holderLoc as TxComponent)?.Name ?? "";
+
+            // 1. Normál scene komponensek
             var allObjects = TxApplication.ActiveDocument.PhysicalRoot
                 .GetAllDescendants(new TxTypeFilter(typeof(TxComponent)));
 
@@ -318,7 +328,46 @@ namespace ISRA.Calculations.AccuSite
                 if (comp.Name.StartsWith("_CONST_")) continue;
                 if (comp.Name.StartsWith("_LOS_")) continue;
                 if (comp.Name.StartsWith("_LED_")) continue;
+                if (!string.IsNullOrEmpty(holderName)
+                    && comp.Name == holderName) continue;
                 sceneList.Add(comp);
+            }
+
+            // 2. Robot leszármazottai külön hozzáadva
+            if (robot != null)
+            {
+                string linkInfo3 = "";
+                foreach (ITxObject linkObj in robot.Links)
+                {
+                    var link = linkObj as TxKinematicLink;
+                    if (link == null) continue;
+
+                    // Minden típus
+                    var all = link.GetAllDescendants(new TxTypeFilter(typeof(ITxObject)));
+                    linkInfo3 += string.Format("Link all descendants: {0}\n", all.Count);
+                    int c2 = 0;
+                    foreach (ITxObject obj in all)
+                    {
+                        if (c2 < 5)
+                            linkInfo3 += string.Format("  -> {0}\n", obj.GetType().Name);
+                        c2++;
+                    }
+                }
+
+                // Robot saját típusa és leszármazottai
+                var robotAll = robot.GetAllDescendants(new TxTypeFilter(typeof(ITxObject)));
+                linkInfo3 += string.Format("\nRobot direct descendants: {0}\n", robotAll.Count);
+                int rc = 0;
+                foreach (ITxObject obj in robotAll)
+                {
+                    if (rc < 10)
+                        linkInfo3 += string.Format("  -> {0} : {1}\n",
+                            obj.GetType().Name,
+                            (obj as TxComponent)?.Name ?? "?");
+                    rc++;
+                }
+
+                System.IO.File.WriteAllText(@"C:\Temp\robotLinks3_debug.txt", linkInfo3);
             }
 
             return sceneList;
