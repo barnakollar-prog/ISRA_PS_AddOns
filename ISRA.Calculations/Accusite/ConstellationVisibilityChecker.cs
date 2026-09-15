@@ -338,31 +338,32 @@ namespace ISRA.Calculations.AccuSite
             {
                 sceneList.Add(robot);
 
-                // Struktúrális leszármazottak (pl. mounted tools)
-                var structuralDescendants = robot.GetAllDescendants(
-                    new TxTypeFilter(typeof(TxComponent)));
-                foreach (ITxObject obj in structuralDescendants)
+                // Robot → TxDevice → EP
+                var txDevice = robot.Collection as ITxObject;
+                if (txDevice != null)
                 {
-                    var comp = obj as TxComponent;
-                    if (comp != null && !sceneList.Contains(comp))
-                        sceneList.Add(comp);
-                }
+                    var epCollection = txDevice.Collection as ITxObjectCollection;
+                    if (epCollection != null)
+                    {
+                        string debug = string.Format("EP type: {0}\n",
+                            epCollection.GetType().Name);
 
-                // Attachment alapú leszármazottak (pl. fupa_2_d140 dresscsomag/kábelek),
-                // amelyek kinematikailag vannak a robothoz csatolva, nem strukturális gyerekként.
-                var attachmentDescendants = new TxObjectList();
-                CollectAttachmentDescendantsRecursive(robot, attachmentDescendants);
-                foreach (ITxObject obj in structuralDescendants)
-                {
-                    var comp = obj as TxComponent;
-                    if (comp != null)
-                        CollectAttachmentDescendantsRecursive(comp, attachmentDescendants);
-                }
-                foreach (ITxObject obj in attachmentDescendants)
-                {
-                    var comp = obj as TxComponent;
-                    if (comp != null && !sceneList.Contains(comp))
-                        sceneList.Add(comp);
+                        var epDescs = epCollection.GetAllDescendants(
+                            new TxTypeFilter(typeof(TxComponent)));
+                        debug += string.Format("EP descendants: {0}\n", epDescs.Count);
+
+                        foreach (ITxObject obj in epDescs)
+                        {
+                            var comp = obj as TxComponent;
+                            if (comp != null)
+                            {
+                                debug += comp.Name + "\n";
+                                if (!sceneList.Contains(comp))
+                                    sceneList.Add(comp);
+                            }
+                        }
+                        System.IO.File.WriteAllText(@"C:\Temp\ep_final_debug.txt", debug);
+                    }
                 }
             }
 
