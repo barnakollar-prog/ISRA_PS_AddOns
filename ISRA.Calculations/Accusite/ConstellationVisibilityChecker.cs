@@ -333,44 +333,73 @@ namespace ISRA.Calculations.AccuSite
                 sceneList.Add(comp);
             }
 
-            // 2. Robot leszármazottai külön hozzáadva
+            // 2. Robot és a hozzá kapcsolódó komponensek (struktúrális + attachment, pl. dresscsomag/kábelek)
             if (robot != null)
             {
-                string linkInfo3 = "";
-                foreach (ITxObject linkObj in robot.Links)
-                {
-                    var link = linkObj as TxKinematicLink;
-                    if (link == null) continue;
+                sceneList.Add(robot);
 
-                    // Minden típus
-                    var all = link.GetAllDescendants(new TxTypeFilter(typeof(ITxObject)));
-                    linkInfo3 += string.Format("Link all descendants: {0}\n", all.Count);
-                    int c2 = 0;
-                    foreach (ITxObject obj in all)
-                    {
-                        if (c2 < 5)
-                            linkInfo3 += string.Format("  -> {0}\n", obj.GetType().Name);
-                        c2++;
-                    }
+                // Struktúrális leszármazottak (pl. mounted tools)
+                var structuralDescendants = robot.GetAllDescendants(
+                    new TxTypeFilter(typeof(TxComponent)));
+                foreach (ITxObject obj in structuralDescendants)
+                {
+                    var comp = obj as TxComponent;
+                    if (comp != null && !sceneList.Contains(comp))
+                        sceneList.Add(comp);
                 }
 
-                // Robot saját típusa és leszármazottai
-                var robotAll = robot.GetAllDescendants(new TxTypeFilter(typeof(ITxObject)));
-                linkInfo3 += string.Format("\nRobot direct descendants: {0}\n", robotAll.Count);
-                int rc = 0;
-                foreach (ITxObject obj in robotAll)
+                // Attachment alapú leszármazottak (pl. fupa_2_d140 dresscsomag/kábelek),
+                // amelyek kinematikailag vannak a robothoz csatolva, nem strukturális gyerekként.
+                var attachmentDescendants = new TxObjectList();
+                CollectAttachmentDescendantsRecursive(robot, attachmentDescendants);
+                foreach (ITxObject obj in structuralDescendants)
                 {
-                    if (rc < 10)
-                        linkInfo3 += string.Format("  -> {0} : {1}\n",
-                            obj.GetType().Name,
-                            (obj as TxComponent)?.Name ?? "?");
-                    rc++;
+                    var comp = obj as TxComponent;
+                    if (comp != null)
+                        CollectAttachmentDescendantsRecursive(comp, attachmentDescendants);
                 }
-
-                System.IO.File.WriteAllText(@"C:\Temp\robotLinks3_debug.txt", linkInfo3);
+                foreach (ITxObject obj in attachmentDescendants)
+                {
+                    var comp = obj as TxComponent;
+                    if (comp != null && !sceneList.Contains(comp))
+                        sceneList.Add(comp);
+                }
             }
 
             return sceneList;
+        }
+
+        /// <summary>
+        /// Recursively collects components attached (kinematically) to the given root object,
+        /// walking the attachment tree (e.g. dress pack/cables attached to a robot or to a tool
+        /// that is itself attached to the robot).
+        /// </summary>
+        private static void CollectAttachmentDescendantsRecursive(
+            ITxLocatableObject root,
+            TxObjectList result)
+        {
+            TxObjectList directAttachments = null;
+
+            var robotRoot = root as TxRobot;
+            var componentRoot = root as TxComponent;
+
+            if (robotRoot != null)
+                directAttachments = robotRoot.GetDirectAttachmentDescendants(
+                    new TxTypeFilter(typeof(TxComponent)));
+            else if (componentRoot != null)
+                directAttachments = componentRoot.GetDirectAttachmentDescendants(
+                    new TxTypeFilter(typeof(TxComponent)));
+
+            if (directAttachments == null) return;
+
+            foreach (ITxObject obj in directAttachments)
+            {
+                var comp = obj as TxComponent;
+                if (comp == null || result.Contains(comp)) continue;
+
+                result.Add(comp);
+                CollectAttachmentDescendantsRecursive(comp, result);
+            }
         }
 
         // ── Phase 3: LED square visualization ────────────────────
