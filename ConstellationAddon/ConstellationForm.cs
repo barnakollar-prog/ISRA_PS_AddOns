@@ -940,7 +940,7 @@ namespace ConstellationAddon
 
             ConstellationVisibilityChecker.CreateAngleVisualizationFiltered(
                 holderLoc, holder, trackerWorld, trackerDef,
-                visibility.AngleResults, _currentPointVis,
+                visibility.AngleResults, visibility.VisibleEmitters, _currentPointVis,
                 chkShowOkLines.Checked,
                 chkShowNokLines.Checked,
                 chkShowFovLines.Checked);

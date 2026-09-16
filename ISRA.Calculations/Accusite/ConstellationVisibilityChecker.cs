@@ -13,6 +13,7 @@ namespace ISRA.Calculations.AccuSite
         public List<VisibleEmitterResult> VisibleEmitters { get; set; }
         public Dictionary<string, int> VisibleCountPerGroup { get; set; }
         public int TotalVisibleCount { get; set; }
+        public List<BlockedEmitterInfo> BlockedEmitters { get; set; }
         /// <summary>True if constellation is within tracker FOV.</summary>
         public bool IsInFov { get; set; }
 
@@ -42,6 +43,13 @@ namespace ISRA.Calculations.AccuSite
         public List<string> VisibleFromCameras { get; set; }
     }
 
+    public class BlockedEmitterInfo
+    {
+        public string EmitterName { get; set; }
+        public string Group { get; set; }
+        public string BlockedBy { get; set; }
+    }
+
     public static class ConstellationVisibilityChecker
     {
         private const double DefaultMaxAngleDeg = AccuSiteConstants.EmitterMaxAngleDeg;
@@ -68,8 +76,10 @@ namespace ISRA.Calculations.AccuSite
             var candidates = GetAngleCandidates(
                 holderLoc, holder, emitters, angleResults, cameras);
 
-            var visibleEmitters = RunLineOfSightFilter(
+            var lineOfSightResult = RunLineOfSightFilter(
                 candidates, trackerWorld, tracker, cameras, holderLoc, robot);
+            var visibleEmitters = lineOfSightResult.visible;
+            var blockedEmitters = lineOfSightResult.blocked;
 
             // ── FOV check ─────────────────────────────────────────────
             // True if at least one emitter is inside the tracker FOV
@@ -120,6 +130,7 @@ namespace ISRA.Calculations.AccuSite
                 VisibleEmitters = visibleEmitters,
                 VisibleCountPerGroup = visibleCountPerGroup,
                 TotalVisibleCount = visibleEmitters.Count,
+                BlockedEmitters = blockedEmitters,
                 IsInFov = isInFov,
                 IsSightBlocked = isSightBlocked
             };
@@ -213,7 +224,7 @@ namespace ISRA.Calculations.AccuSite
 
         // ── Phase 2: line-of-sight ────────────────────────────────
 
-        private static List<VisibleEmitterResult> RunLineOfSightFilter(
+        private static (List<VisibleEmitterResult> visible, List<BlockedEmitterInfo> blocked) RunLineOfSightFilter(
             List<(SensorEmitterData emitter, TxVector worldPos, TxVector worldZ,
           List<string> candidateCameras)> candidates,
             TxTransformation trackerWorld,
@@ -224,11 +235,13 @@ namespace ISRA.Calculations.AccuSite
 
         {
             var visible = new List<VisibleEmitterResult>();
+            var blocked = new List<BlockedEmitterInfo>();
             var sceneList = BuildSceneList(holderLoc, robot);
 
             foreach (var (emitter, worldPos, worldZ, candidateCameras) in candidates)
             {
                 var clearCameras = new List<string>();
+                string blockerName = null;
 
                 foreach (var cameraName in candidateCameras)
                 {
@@ -238,9 +251,11 @@ namespace ISRA.Calculations.AccuSite
                     if (cam == null) continue;
 
                     TxVector cameraWorldPos = tracker.GetCameraWorldPosition(trackerWorld, cam);
-                    bool blocked = CheckLineOfSight(cameraWorldPos, worldPos, sceneList);
-                    if (!blocked)
+                    string thisBlocker = CheckLineOfSightBlocker(cameraWorldPos, worldPos, sceneList);
+                    if (thisBlocker == null)
                         clearCameras.Add(cameraName);
+                    else if (blockerName == null)
+                        blockerName = thisBlocker;
                 }
 
                 if (clearCameras.Count > 0)
@@ -254,9 +269,18 @@ namespace ISRA.Calculations.AccuSite
                         VisibleFromCameras = clearCameras
                     });
                 }
+                else if (blockerName != null)
+                {
+                    blocked.Add(new BlockedEmitterInfo
+                    {
+                        EmitterName = emitter.Name,
+                        Group = emitter.Group,
+                        BlockedBy = blockerName
+                    });
+                }
             }
 
-            return visible;
+            return (visible, blocked);
         }
 
         private static bool CheckLineOfSight(
@@ -310,6 +334,75 @@ namespace ISRA.Calculations.AccuSite
             }
         }
 
+        private static string CheckLineOfSightBlocker(
+            TxVector cameraWorldPos,
+            TxVector emitterWorldPos,
+            TxObjectList sceneList)
+        {
+            TxVector dir = Normalize(new TxVector(
+                emitterWorldPos.X - cameraWorldPos.X,
+                emitterWorldPos.Y - cameraWorldPos.Y,
+                emitterWorldPos.Z - cameraWorldPos.Z));
+
+            TxVector camOffset = new TxVector(
+                cameraWorldPos.X + dir.X * 10.0,
+                cameraWorldPos.Y + dir.Y * 10.0,
+                cameraWorldPos.Z + dir.Z * 10.0);
+            TxVector emOffset = new TxVector(
+                emitterWorldPos.X - dir.X * 10.0,
+                emitterWorldPos.Y - dir.Y * 10.0,
+                emitterWorldPos.Z - dir.Z * 10.0);
+
+            TxComponent cylComp = null;
+            try
+            {
+                var compData = new TxLocalComponentCreationData("_CONST_LOS_temp");
+                cylComp = TxApplication.ActiveDocument.PhysicalRoot
+                    .CreateLocalComponent(compData);
+
+                var cylData = new TxCylinderCreationData(
+                    "cylinder", camOffset, emOffset, CylinderRadius);
+                cylData.SetAsDisplay();
+                cylComp.CreateSolidCylinder(cylData);
+
+                TxObjectList cylList = new TxObjectList();
+                cylList.Add(cylComp);
+
+                var queryParams = new TxCollisionQueryParams
+                {
+                    Mode = TxCollisionQueryParams.TxCollisionQueryMode.All,
+                    StopQueryAfterFirstCollision = true,
+                    ReportLevel = TxCollisionQueryParams.TxCollisionReportLevel.ComponentLevel
+                };
+
+                TxCollisionQueryResults results = TxApplication.ActiveDocument.CollisionRoot
+                    .GetCollidingObjectsFromLists(cylList, sceneList, queryParams);
+
+                if (results == null) return null;
+
+                foreach (TxCollisionState state in results.States)
+                {
+                    if (state.Type != TxCollisionState.TxCollisionStateType.Collision)
+                        continue;
+
+                    ITxObject blocker = state.FirstObject == (ITxObject)cylComp
+                        ? state.SecondObject
+                        : state.FirstObject;
+
+                    if (blocker == null) continue;
+
+                    return (blocker as TxComponent)?.Name ?? blocker.ToString();
+                }
+
+                return null;
+            }
+            catch { return null; }
+            finally
+            {
+                try { cylComp?.Delete(); } catch { }
+            }
+        }
+
         private static TxObjectList BuildSceneList(
             ITxLocatableObject holderLoc,
             TxRobot robot)
@@ -338,31 +431,30 @@ namespace ISRA.Calculations.AccuSite
             {
                 sceneList.Add(robot);
 
-                // Robot → TxDevice → EP
                 var txDevice = robot.Collection as ITxObject;
                 if (txDevice != null)
                 {
                     var epCollection = txDevice.Collection as ITxObjectCollection;
                     if (epCollection != null)
                     {
-                        string debug = string.Format("EP type: {0}\n",
-                            epCollection.GetType().Name);
-
-                        var epDescs = epCollection.GetAllDescendants(
+                        // TxComponent-ek (EZ_Achse stb.)
+                        var epComps = epCollection.GetAllDescendants(
                             new TxTypeFilter(typeof(TxComponent)));
-                        debug += string.Format("EP descendants: {0}\n", epDescs.Count);
-
-                        foreach (ITxObject obj in epDescs)
+                        foreach (ITxObject obj in epComps)
                         {
                             var comp = obj as TxComponent;
-                            if (comp != null)
-                            {
-                                debug += comp.Name + "\n";
-                                if (!sceneList.Contains(comp))
-                                    sceneList.Add(comp);
-                            }
+                            if (comp != null && !sceneList.Contains(comp))
+                                sceneList.Add(comp);
                         }
-                        System.IO.File.WriteAllText(@"C:\Temp\ep_final_debug.txt", debug);
+
+                        // TxDevice-ok (fupa, dress pack) + azok belső komponensei
+                        var epDevices = epCollection.GetAllDescendants(
+                            new TxTypeFilter(typeof(TxDevice)));
+                        foreach (ITxObject obj in epDevices)
+                        {
+                            if (obj != null && !sceneList.Contains(obj))
+                                sceneList.Add(obj);
+                        }
                     }
                 }
             }
@@ -506,11 +598,12 @@ namespace ISRA.Calculations.AccuSite
     TxTransformation trackerWorld,
     ITracker tracker,
     EmitterCameraAngleResult[,] angleResults,
+    List<VisibleEmitterResult> visibleEmitters,   // ← ÚJ
     List<TxComponent> visComponents,
     bool showOk,
     bool showNok,
     bool showFov,
-    double maxAngleDeg = 40.0)
+    double maxAngleDeg = 55.0)
         {
             var emitters = holder.GetEmitters();
             var cameras = tracker.GetCameras();
@@ -533,6 +626,17 @@ namespace ISRA.Calculations.AccuSite
                     TxVector emitterWorldPos = holder.GetEmitterWorldPosition(
                         holderLoc, emitters[e]);
 
+                    // Melyik kamerák látják LOS-szal ezt az emittert?
+                    List<string> losClearCameras = null;
+                    foreach (var vis in visibleEmitters)
+                    {
+                        if (vis.EmitterName == emitters[e].Name)
+                        {
+                            losClearCameras = vis.VisibleFromCameras;
+                            break;
+                        }
+                    }
+
                     for (int c = 0; c < cameras.Length; c++)
                     {
                         TxVector cameraWorldPos = tracker.GetCameraWorldPosition(
@@ -541,10 +645,16 @@ namespace ISRA.Calculations.AccuSite
                         var result = angleResults[e, c];
 
                         bool isFov = double.IsNaN(result.AngleDeg);
-                        bool isOk = !isFov && result.PassedAngle;
-                        bool isNok = !isFov && !result.PassedAngle;
+                        bool angleOk = !isFov && result.PassedAngle;
 
-                        // Filter
+                        // LOS check — látja-e ez a kamera LOS-szal?
+                        bool losOk = losClearCameras != null
+                                  && losClearCameras.Contains(cameras[c].Name);
+
+                        // Csak akkor zöld, ha angle OK ÉS LOS OK
+                        bool isOk = angleOk && losOk;
+                        bool isNok = !isFov && !isOk;
+
                         if (isFov && !showFov) continue;
                         if (isOk && !showOk) continue;
                         if (isNok && !showNok) continue;
