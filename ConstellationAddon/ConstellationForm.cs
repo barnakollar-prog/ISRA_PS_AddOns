@@ -35,8 +35,8 @@ namespace ConstellationAddon
         private CheckBox chkShowOkLines;
         private CheckBox chkShowNokLines;
         private CheckBox chkShowFovLines;
-        private CheckBox chkShowFovVolume;
-        private NumericUpDown numFovScalePercent;
+        private CheckBox[] chkShowFovVolumePerTracker;
+        private NumericUpDown[] numFovScalePercentPerTracker;
         private string _currentPointName = null;
 
         // ── Measurement point filter ──────────────────────────────────────
@@ -64,7 +64,7 @@ namespace ConstellationAddon
 
         // ── Configuration — change to scale up ───────────────────
         private const int TrackerCount = 4;  // → 8 when needed
-        private const int TrackerCols = 2;  // → 4 when needed
+        private const int TrackerCols = 1;  // single column so each row can host FOV controls
 
         // ── Measurement point filter accessors ──────────────────────────
         private FilterMode CurrentFilterMode
@@ -227,7 +227,7 @@ namespace ConstellationAddon
 
             // ── Trackers (2x2 grid, expandable to 4x2) ───────────
             int trackerRows = (int)Math.Ceiling((double)TrackerCount / TrackerCols);
-            int cellW = 400;
+            int cellW = 780;
             int cellH = 34;
             int grpTrackerH = 20 + trackerRows * cellH + 8;
 
@@ -242,6 +242,8 @@ namespace ConstellationAddon
             };
 
             pickerTrackers = new TxObjEditBoxCtrl[TrackerCount];
+            numFovScalePercentPerTracker = new NumericUpDown[TrackerCount];
+            chkShowFovVolumePerTracker = new CheckBox[TrackerCount];
 
             for (int i = 0; i < TrackerCount; i++)
             {
@@ -255,27 +257,76 @@ namespace ConstellationAddon
                     Text = string.Format("Tracker {0}:", i + 1),
                     Left = cx,
                     Top = cy + 2,
-                    Width = 78,
+                    Width = 60,
                     Height = 20,
                     TextAlign = ContentAlignment.MiddleLeft
                 });
 
                 pickerTrackers[i] = new TxObjEditBoxCtrl
                 {
-                    Left = cx + 72,
+                    Left = cx + 62,
                     Top = cy,
-                    Width = 310,
+                    Width = 320,
                     Height = 24,
                     ValidatorType = TxValidatorType.Component,
                     PickLevel = TxPickLevel.Component,
                     PickOnly = false,
-                    ListenToPick = true
+                    ListenToPick = true,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
                 };
                 grpTrackers.Controls.Add(pickerTrackers[i]);
+
+                grpTrackers.Controls.Add(new Label
+                {
+                    Text = "Grow FOV (%):",
+                    Left = cx + 392,
+                    Top = cy + 2,
+                    Width = 90,
+                    Height = 20,
+                    TextAlign = ContentAlignment.MiddleLeft,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Right
+                });
+
+                numFovScalePercentPerTracker[i] = new NumericUpDown
+                {
+                    Left = cx + 486,
+                    Top = cy,
+                    Width = 50,
+                    Minimum = 0,
+                    Maximum = 10,
+                    Increment = 1,
+                    DecimalPlaces = 0,
+                    Value = 0,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Right
+                };
+                numFovScalePercentPerTracker[i].ValueChanged += OnVisFilterChanged;
+                grpTrackers.Controls.Add(numFovScalePercentPerTracker[i]);
+
+                chkShowFovVolumePerTracker[i] = new CheckBox
+                {
+                    Text = "Show FOV",
+                    Left = cx + 542,
+                    Top = cy + 2,
+                    Width = 90,
+                    Height = 20,
+                    Checked = false,
+                    Anchor = AnchorStyles.Top | AnchorStyles.Right
+                };
+                chkShowFovVolumePerTracker[i].CheckedChanged += OnVisFilterChanged;
+                grpTrackers.Controls.Add(chkShowFovVolumePerTracker[i]);
             }
 
             this.Controls.Add(grpTrackers);
             y += grpTrackerH + 10;
+
+            // ── Auto-focus chaining: Robot → Holder Component → Tracker 1..4 ────
+            pickerRobot.Picked += (s, e) => pickerSensorHolderComp.Focus();
+            pickerSensorHolderComp.Picked += (s, e) => pickerTrackers[0].Focus();
+            for (int i = 0; i < TrackerCount - 1; i++)
+            {
+                int nextIndex = i + 1;
+                pickerTrackers[i].Picked += (s, e) => pickerTrackers[nextIndex].Focus();
+            }
 
             // ── Measurement Path ──────────────────────────────────
             var grpPaths = new GroupBox
@@ -514,56 +565,6 @@ namespace ConstellationAddon
             this.Controls.Add(pnlVisFilter);
             y += 32;
 
-            // ── FOV scale ──────────────────────────────────────────────────────
-            var grpFovScale = new GroupBox
-            {
-                Text = "FOV Scale (design safety margin)",
-                Left = lx,
-                Top = y,
-                Width = 806,
-                Height = 66,
-                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
-            };
-
-            var lblFovScale = new Label
-            {
-                Text = "Grow FOV dimension (X/Y/Z) by (%):",
-                Left = 10,
-                Top = 24,
-                Width = 220,
-                Height = 20
-            };
-            grpFovScale.Controls.Add(lblFovScale);
-
-            numFovScalePercent = new NumericUpDown
-            {
-                Left = 235,
-                Top = 21,
-                Width = 60,
-                Minimum = 0,
-                Maximum = 10,
-                Increment = 1,
-                DecimalPlaces = 0,
-                Value = 0
-            };
-            numFovScalePercent.ValueChanged += OnVisFilterChanged;
-            grpFovScale.Controls.Add(numFovScalePercent);
-
-            chkShowFovVolume = new CheckBox
-            {
-                Text = "Show FOV volume (visual only, never a collision object)",
-                Left = 10,
-                Top = 42,
-                Width = 450,
-                Height = 20,
-                Checked = false
-            };
-            chkShowFovVolume.CheckedChanged += OnVisFilterChanged;
-            grpFovScale.Controls.Add(chkShowFovVolume);
-
-            this.Controls.Add(grpFovScale);
-            y += 74;
-
             // ── Results TabControl ────────────────────────────────
             var grpResults = new GroupBox
             {
@@ -728,10 +729,15 @@ namespace ConstellationAddon
 
             // Collect trackers (at least one required)
             var trackers = new List<ITxLocatableObject>();
+            var trackerOriginalIndices = new List<int>();
             for (int i = 0; i < TrackerCount; i++)
             {
                 var t = pickerTrackers[i].Object as ITxLocatableObject;
-                if (t != null) trackers.Add(t);
+                if (t != null)
+                {
+                    trackers.Add(t);
+                    trackerOriginalIndices.Add(i);
+                }
             }
 
             if (trackers.Count == 0)
@@ -832,10 +838,13 @@ namespace ConstellationAddon
                         // Üres temp lista — nem jelenítünk meg semmit analízis közben
                         var tempVis = new List<TxComponent>();
 
+                        int trackerOriginalIndex = trackerOriginalIndices[t];
+                        double trackerFovScalePercent = (double)numFovScalePercentPerTracker[trackerOriginalIndex].Value;
+
                         var visibility = ConstellationVisibilityChecker.Check(
                             holderLoc, holder, trackerWorld, trackerDef,
                             tempVis, robot, AccuSiteConstants.EmitterMaxAngleDeg,
-                            (double)numFovScalePercent.Value);
+                            trackerFovScalePercent);
 
                         // Tárold az eredményt pontonként
                         _pointVisibility[loc.Name] = visibility;
@@ -1050,21 +1059,16 @@ namespace ConstellationAddon
         {
             ConstellationVisibilityChecker.DeleteVisualizations(_fovVisComponents);
 
-            if (!chkShowFovVolume.Checked) return;
+            ITracker trackerDef = new Tracker920_0005();
 
-            var trackerList = new List<ITxLocatableObject>();
             for (int i = 0; i < TrackerCount; i++)
             {
-                var t = pickerTrackers[i].Object as ITxLocatableObject;
-                if (t != null) trackerList.Add(t);
-            }
-            if (trackerList.Count == 0) return;
+                if (!chkShowFovVolumePerTracker[i].Checked) continue;
 
-            ITracker trackerDef = new Tracker920_0005();
-            double fovScalePercent = (double)numFovScalePercent.Value;
+                var tracker = pickerTrackers[i].Object as ITxLocatableObject;
+                if (tracker == null) continue;
 
-            foreach (var tracker in trackerList)
-            {
+                double fovScalePercent = (double)numFovScalePercentPerTracker[i].Value;
                 TxTransformation trackerWorld = tracker.AbsoluteLocation;
                 ConstellationVisibilityChecker.CreateFovVisualization(
                     trackerWorld, trackerDef, _fovVisComponents, fovScalePercent);
