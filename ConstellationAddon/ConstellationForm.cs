@@ -35,6 +35,8 @@ namespace ConstellationAddon
         private CheckBox chkShowOkLines;
         private CheckBox chkShowNokLines;
         private CheckBox chkShowFovLines;
+        private CheckBox chkShowFovVolume;
+        private NumericUpDown numFovScalePercent;
         private string _currentPointName = null;
 
         // ── Measurement point filter ──────────────────────────────────────
@@ -55,6 +57,8 @@ namespace ConstellationAddon
         private readonly Dictionary<string, string> _pointTrackerLabel
             = new Dictionary<string, string>();
         private List<TxComponent> _currentPointVis
+            = new List<TxComponent>();
+        private List<TxComponent> _fovVisComponents
             = new List<TxComponent>();
 
 
@@ -510,6 +514,56 @@ namespace ConstellationAddon
             this.Controls.Add(pnlVisFilter);
             y += 32;
 
+            // ── FOV scale ──────────────────────────────────────────────────────
+            var grpFovScale = new GroupBox
+            {
+                Text = "FOV Scale (design safety margin)",
+                Left = lx,
+                Top = y,
+                Width = 806,
+                Height = 66,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            var lblFovScale = new Label
+            {
+                Text = "Grow FOV dimension (X/Y/Z) by (%):",
+                Left = 10,
+                Top = 24,
+                Width = 220,
+                Height = 20
+            };
+            grpFovScale.Controls.Add(lblFovScale);
+
+            numFovScalePercent = new NumericUpDown
+            {
+                Left = 235,
+                Top = 21,
+                Width = 60,
+                Minimum = 0,
+                Maximum = 10,
+                Increment = 1,
+                DecimalPlaces = 0,
+                Value = 0
+            };
+            numFovScalePercent.ValueChanged += OnVisFilterChanged;
+            grpFovScale.Controls.Add(numFovScalePercent);
+
+            chkShowFovVolume = new CheckBox
+            {
+                Text = "Show FOV volume (visual only, never a collision object)",
+                Left = 10,
+                Top = 42,
+                Width = 450,
+                Height = 20,
+                Checked = false
+            };
+            chkShowFovVolume.CheckedChanged += OnVisFilterChanged;
+            grpFovScale.Controls.Add(chkShowFovVolume);
+
+            this.Controls.Add(grpFovScale);
+            y += 74;
+
             // ── Results TabControl ────────────────────────────────
             var grpResults = new GroupBox
             {
@@ -780,7 +834,8 @@ namespace ConstellationAddon
 
                         var visibility = ConstellationVisibilityChecker.Check(
                             holderLoc, holder, trackerWorld, trackerDef,
-                            tempVis, robot);
+                            tempVis, robot, AccuSiteConstants.EmitterMaxAngleDeg,
+                            (double)numFovScalePercent.Value);
 
                         // Tárold az eredményt pontonként
                         _pointVisibility[loc.Name] = visibility;
@@ -984,9 +1039,36 @@ namespace ConstellationAddon
         }
         private void OnVisFilterChanged(object sender, EventArgs e)
         {
+            RedrawFovVisualization();
+
             // Ha van kiválasztott pont, újrarajzoljuk a vonalakat
             if (_currentPointName == null) return;
             RedrawCurrentPointVisualization();
+        }
+
+        private void RedrawFovVisualization()
+        {
+            ConstellationVisibilityChecker.DeleteVisualizations(_fovVisComponents);
+
+            if (!chkShowFovVolume.Checked) return;
+
+            var trackerList = new List<ITxLocatableObject>();
+            for (int i = 0; i < TrackerCount; i++)
+            {
+                var t = pickerTrackers[i].Object as ITxLocatableObject;
+                if (t != null) trackerList.Add(t);
+            }
+            if (trackerList.Count == 0) return;
+
+            ITracker trackerDef = new Tracker920_0005();
+            double fovScalePercent = (double)numFovScalePercent.Value;
+
+            foreach (var tracker in trackerList)
+            {
+                TxTransformation trackerWorld = tracker.AbsoluteLocation;
+                ConstellationVisibilityChecker.CreateFovVisualization(
+                    trackerWorld, trackerDef, _fovVisComponents, fovScalePercent);
+            }
         }
         private void RedrawCurrentPointVisualization()
         {
@@ -1067,6 +1149,7 @@ namespace ConstellationAddon
                 TxApplication.ActiveSelection.ItemsAdded -= OnSelectionAdded;
                 ConstellationVisibilityChecker.DeleteVisualizations(_visComponents);
                 ConstellationVisibilityChecker.DeleteVisualizations(_currentPointVis);
+                ConstellationVisibilityChecker.DeleteVisualizations(_fovVisComponents);
                 _currentPointName = null;
             }
             catch { }

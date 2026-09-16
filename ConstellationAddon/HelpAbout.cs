@@ -11,7 +11,7 @@ namespace ConstellationAddon
     public static class HelpAbout
     {
         // ── Version info ──────────────────────────────────────────
-        public const string Version = "1.0.0";
+        public const string Version = "1.1.0";
         public const string LastUpdated = "September 2026";
         public const string Author = "ISRA Vision / CAD & Simulation";
 
@@ -99,6 +99,36 @@ SENSOR HOLDER
   8 NAUO groups x 5 emitters = 40 LEDs total
   All coordinates relative to holder self-origin (= robot flange)
 
+MEASUREMENT POINT FILTER
+------------------------
+Three filter modes are available (selectable in the UI) to decide
+which locations on the selected path(s) are analyzed:
+
+NO FILTER
+   All locations in the selected path(s) are included.
+   No filtering is applied.
+
+AUTO (default)
+   Points are identified by two methods:
+
+   1. NAME PREFIX (primary)
+      Points starting with ""mp"" (case-insensitive)
+
+   2. OLP COMMAND TEXT (fallback, robot backup programs)
+      Points containing any of the following keywords in their
+      OLP command text are treated as measurement points:
+      - meas, cmeas   : generic / conditional measurement
+      - inline        : inline measurement
+      - VW_USER       : VW specific
+      - TECH10        : Perceptron
+      - PRC_IMT       : IMT measurement process
+
+CUSTOM
+   User-defined prefixes and OLP keywords.
+   Enter comma-separated values in the filter fields:
+   - Prefixes     : name prefixes for measurement points
+   - OLP keywords : fallback keywords in OLP command text
+
 KNOWN LIMITATIONS
 -----------------
 - Collision check requires pre-defined pair in PS Collision Viewer
@@ -121,8 +151,8 @@ DEVELOPED BY
             var dlg = new Form
             {
                 Text = "About - Constellation Validator",
-                Width = 520,
-                Height = 620,
+                Width = 560,
+                Height = 640,
                 FormBorderStyle = FormBorderStyle.FixedDialog,
                 MaximizeBox = false,
                 MinimizeBox = false,
@@ -134,7 +164,7 @@ DEVELOPED BY
                 Text = "Accusite Constellation Validator",
                 Left = 16,
                 Top = 12,
-                Width = 470,
+                Width = 510,
                 Height = 24,
                 Font = new Font("Segoe UI", 12, FontStyle.Bold),
                 ForeColor = Color.FromArgb(180, 0, 0)
@@ -146,7 +176,7 @@ DEVELOPED BY
                                 Version, LastUpdated, Author),
                 Left = 16,
                 Top = 38,
-                Width = 470,
+                Width = 510,
                 Height = 18,
                 Font = new Font("Segoe UI", 8),
                 ForeColor = Color.Gray
@@ -156,7 +186,7 @@ DEVELOPED BY
             {
                 Left = 16,
                 Top = 60,
-                Width = 470,
+                Width = 510,
                 Height = 2,
                 BorderStyle = BorderStyle.Fixed3D
             };
@@ -166,8 +196,8 @@ DEVELOPED BY
                 Text = AboutText,
                 Left = 16,
                 Top = 70,
-                Width = 470,
-                Height = 460,
+                Width = 510,
+                Height = 470,
                 Multiline = true,
                 ReadOnly = true,
                 ScrollBars = ScrollBars.Vertical,
@@ -179,8 +209,8 @@ DEVELOPED BY
             var btnClose = new Button
             {
                 Text = "Close",
-                Left = 390,
-                Top = 544,
+                Left = 430,
+                Top = 552,
                 Width = 96,
                 Height = 28,
                 DialogResult = DialogResult.OK

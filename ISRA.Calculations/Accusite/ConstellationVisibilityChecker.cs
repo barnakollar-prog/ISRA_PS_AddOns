@@ -65,13 +65,14 @@ namespace ISRA.Calculations.AccuSite
     ITracker tracker,
     List<TxComponent> visComponents,
     TxRobot robot,
-    double maxAngleDeg = DefaultMaxAngleDeg)
+    double maxAngleDeg = DefaultMaxAngleDeg,
+    double fovScalePercent = 0.0)
         {
             var emitters = holder.GetEmitters();
             var cameras = tracker.GetCameras();
 
             var angleResults = RunAngleFilter(
-                holderLoc, holder, emitters, trackerWorld, tracker, cameras, maxAngleDeg);
+                holderLoc, holder, emitters, trackerWorld, tracker, cameras, maxAngleDeg, fovScalePercent);
 
             var candidates = GetAngleCandidates(
                 holderLoc, holder, emitters, angleResults, cameras);
@@ -89,7 +90,7 @@ namespace ISRA.Calculations.AccuSite
             {
                 TxVector emitterLocalPos = trackerInverse.Transform(
                     holder.GetEmitterWorldPosition(holderLoc, emitter));
-                if (tracker.IsInFOV(emitterLocalPos)) { isInFov = true; break; }
+                if (tracker.IsInFOV(emitterLocalPos, fovScalePercent)) { isInFov = true; break; }
             }
 
             // ── Sight check ───────────────────────────────────────────
@@ -145,7 +146,8 @@ namespace ISRA.Calculations.AccuSite
             TxTransformation trackerWorld,
             ITracker tracker,
             CameraData[] cameras,
-            double maxAngleDeg)
+            double maxAngleDeg,
+            double fovScalePercent = 0.0)
         {
             int eCount = emitters.Length;
             int cCount = cameras.Length;
@@ -159,7 +161,7 @@ namespace ISRA.Calculations.AccuSite
                 TxVector emitterWorldZ = holder.GetEmitterWorldZVector(holderLoc, emitters[e]);
 
                 TxVector emitterLocalPos = trackerInverse.Transform(emitterWorldPos);
-                bool inFov = tracker.IsInFOV(emitterLocalPos);
+                bool inFov = tracker.IsInFOV(emitterLocalPos, fovScalePercent);
 
                 for (int c = 0; c < cCount; c++)
                 {
@@ -668,6 +670,89 @@ namespace ISRA.Calculations.AccuSite
                             new TxLineCreationData(lineName, identity,
                                 cameraWorldPos, emitterWorldPos));
                         line.Color = lineColor;
+                        anyLine = true;
+                    }
+                }
+
+                if (anyLine)
+                {
+                    TxApplication.RefreshDisplay();
+                    visComponents.Add(comp);
+                }
+                else
+                {
+                    comp.Delete();
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>
+        /// Draws a wireframe of the (scaled) tracker FOV volume for visual inspection only.
+        /// This is a purely visual overlay: it is added to <paramref name="visComponents"/> for
+        /// later cleanup, but it is NEVER added to any collision scene list, so it can never be
+        /// considered a colliding pair.
+        /// </summary>
+        public static void CreateFovVisualization(
+            TxTransformation trackerWorld,
+            ITracker tracker,
+            List<TxComponent> visComponents,
+            double fovScalePercent = 0.0)
+        {
+            var zones = tracker.GetFovZones(fovScalePercent);
+            if (zones == null || zones.Length == 0) return;
+
+            TxColor fovColor = new TxColor(0, 160, 255);
+
+            try
+            {
+                var compData = new TxLocalComponentCreationData("_CONST_FOV_vis");
+                var comp = TxApplication.ActiveDocument.PhysicalRoot
+                    .CreateLocalComponent(compData);
+
+                bool anyLine = false;
+
+                TxVector[][] cornersPerZone = new TxVector[zones.Length][];
+                for (int i = 0; i < zones.Length; i++)
+                {
+                    var zone = zones[i];
+                    TxVector[] localCorners = new[]
+                    {
+                        new TxVector( zone.XMax,  zone.YMax, zone.Z),
+                        new TxVector(-zone.XMax,  zone.YMax, zone.Z),
+                        new TxVector(-zone.XMax, -zone.YMax, zone.Z),
+                        new TxVector( zone.XMax, -zone.YMax, zone.Z)
+                    };
+
+                    TxVector[] worldCorners = new TxVector[4];
+                    for (int k = 0; k < 4; k++)
+                        worldCorners[k] = trackerWorld.Transform(localCorners[k]);
+
+                    cornersPerZone[i] = worldCorners;
+
+                    for (int k = 0; k < 4; k++)
+                    {
+                        int next = (k + 1) % 4;
+                        string lineName = string.Format("_FOV_{0}_{1}", zone.Name, k);
+                        var line = comp.CreateLine(
+                            new TxLineCreationData(lineName, new TxTransformation(),
+                                worldCorners[k], worldCorners[next]));
+                        line.Color = fovColor;
+                        anyLine = true;
+                    }
+                }
+
+                for (int i = 0; i < cornersPerZone.Length - 1; i++)
+                {
+                    var a = cornersPerZone[i];
+                    var b = cornersPerZone[i + 1];
+                    for (int k = 0; k < 4; k++)
+                    {
+                        string lineName = string.Format("_FOV_link_{0}_{1}", i, k);
+                        var line = comp.CreateLine(
+                            new TxLineCreationData(lineName, new TxTransformation(),
+                                a[k], b[k]));
+                        line.Color = fovColor;
                         anyLine = true;
                     }
                 }

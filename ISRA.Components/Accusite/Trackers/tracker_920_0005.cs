@@ -70,32 +70,97 @@ namespace ISRA.Components.AccuSite.Trackers
         /// </summary>
         public bool IsInFOV(TxVector localPoint)
         {
+            return IsInFOV(localPoint, 0.0);
+        }
+
+        /// <summary>
+        /// Checks if a point (in tracker local coordinates) is within the Field of View,
+        /// after growing the FOV's X/Y/Z dimensions by <paramref name="fovScalePercent"/> percent
+        /// (0-10, relaxing the already-reduced design FOV). The Near/Far Z boundaries
+        /// are moved away from the Mid plane by the same percentage.
+        /// Uses linear interpolation between Near, Mid, and Far field boundaries.
+        /// </summary>
+        public bool IsInFOV(TxVector localPoint, double fovScalePercent)
+        {
             double z = localPoint.Z;
             double x = Math.Abs(localPoint.X);
             double y = Math.Abs(localPoint.Y);
 
-            // Outside Z range
-            if (z < NearZ || z > FarZ) return false;
+            double factor = GetScaleFactor(fovScalePercent);
+            double nearZ = MidZ + (NearZ - MidZ) * factor;
+            double farZ = MidZ + (FarZ - MidZ) * factor;
 
-            // Interpolate X and Y limits based on Z position
+            // Outside Z range
+            if (z < nearZ || z > farZ) return false;
+
             double xMax, yMax;
+            GetFovLimitsAtZ(z, fovScalePercent, out xMax, out yMax);
+
+            return x <= xMax && y <= yMax;
+        }
+
+        /// <summary>
+        /// Returns the FOV boundary zones (Near/Mid/Far) in tracker local coordinates,
+        /// with X/Y/Z dimensions grown by <paramref name="fovScalePercent"/> percent (0-10).
+        /// Used to build a visual wireframe of the (scaled) FOV volume.
+        /// </summary>
+        public FovZone[] GetFovZones(double fovScalePercent)
+        {
+            double factor = GetScaleFactor(fovScalePercent);
+            double nearZ = MidZ + (NearZ - MidZ) * factor;
+            double farZ = MidZ + (FarZ - MidZ) * factor;
+
+            return new[]
+            {
+                new FovZone { Name = "Near", Z = nearZ, XMax = NearXMax * factor, YMax = NearYMax * factor },
+                new FovZone { Name = "Mid",  Z = MidZ,  XMax = MidXMax  * factor, YMax = MidYMax  * factor },
+                new FovZone { Name = "Far",  Z = farZ,  XMax = FarXMax  * factor, YMax = FarYMax  * factor }
+            };
+        }
+
+        /// <summary>
+        /// Interpolates the X/Y FOV limits at a given local Z, after applying the scale factor
+        /// (which grows the FOV).
+        /// </summary>
+        private static void GetFovLimitsAtZ(double z, double fovScalePercent, out double xMax, out double yMax)
+        {
+            double factor = GetScaleFactor(fovScalePercent);
+
+            double nearZ = MidZ + (NearZ - MidZ) * factor;
+            double farZ = MidZ + (FarZ - MidZ) * factor;
+
+            double nearXMax = NearXMax * factor;
+            double nearYMax = NearYMax * factor;
+            double midXMax = MidXMax * factor;
+            double midYMax = MidYMax * factor;
+            double farXMax = FarXMax * factor;
+            double farYMax = FarYMax * factor;
 
             if (z <= MidZ)
             {
                 // Between Near and Mid
-                double t = (z - NearZ) / (MidZ - NearZ);
-                xMax = NearXMax + t * (MidXMax - NearXMax);
-                yMax = NearYMax + t * (MidYMax - NearYMax);
+                double t = (z - nearZ) / (MidZ - nearZ);
+                xMax = nearXMax + t * (midXMax - nearXMax);
+                yMax = nearYMax + t * (midYMax - nearYMax);
             }
             else
             {
                 // Between Mid and Far
-                double t = (z - MidZ) / (FarZ - MidZ);
-                xMax = MidXMax + t * (FarXMax - MidXMax);
-                yMax = MidYMax + t * (FarYMax - MidYMax);
+                double t = (z - MidZ) / (farZ - MidZ);
+                xMax = midXMax + t * (farXMax - midXMax);
+                yMax = midYMax + t * (farYMax - midYMax);
             }
+        }
 
-            return x <= xMax && y <= yMax;
+        /// <summary>
+        /// Converts a 0-10 percent FOV increase into a multiplicative scale factor (1.0 - 1.1).
+        /// Clamped to the valid 0-10 range. Growing the FOV (rather than shrinking it) lets the
+        /// user relax the already-conservative design margin for analysis purposes.
+        /// </summary>
+        private static double GetScaleFactor(double fovScalePercent)
+        {
+            double clamped = Math.Max(0.0, Math.Min(10.0, fovScalePercent));
+            return 1.0 + (clamped / 100.0);
         }
 
         /// <summary>
