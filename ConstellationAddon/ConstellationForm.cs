@@ -1,10 +1,12 @@
 ﻿using ISRA.Calculations.AccuSite;
+using ISRA.Calculations.TempComp;
 using ISRA.Components.AccuSite.SensorHolders;
 using ISRA.Components.AccuSite.Trackers;
 using ISRA.Core.Utilities;
 using System;
 using System.Collections.Generic;
 using System.Drawing;
+using System.Linq;
 using System.Windows.Forms;
 using Tecnomatix.Engineering;
 using Tecnomatix.Engineering.Olp.OLP_Utilities;
@@ -35,6 +37,13 @@ namespace ConstellationAddon
         private CheckBox chkShowFovLines;
         private string _currentPointName = null;
 
+        // ── Measurement point filter ──────────────────────────────────────
+        private RadioButton rbFilterNone;
+        private RadioButton rbFilterAuto;
+        private RadioButton rbFilterCustom;
+        private TextBox txtFilterPrefixes;
+        private TextBox txtFilterOlpKeywords;
+
         // ── State ─────────────────────────────────────────────────
         private readonly List<TxWeldOperation> _paths
             = new List<TxWeldOperation>();
@@ -52,6 +61,46 @@ namespace ConstellationAddon
         // ── Configuration — change to scale up ───────────────────
         private const int TrackerCount = 4;  // → 8 when needed
         private const int TrackerCols = 2;  // → 4 when needed
+
+        // ── Measurement point filter accessors ──────────────────────────
+        private FilterMode CurrentFilterMode
+        {
+            get
+            {
+                if (rbFilterNone.Checked) return FilterMode.NoFilter;
+                if (rbFilterCustom.Checked) return FilterMode.Custom;
+                return FilterMode.Auto;
+            }
+        }
+
+        private string[] CurrentFilterPrefixes
+        {
+            get
+            {
+                if (CurrentFilterMode == FilterMode.Custom)
+                {
+                    return txtFilterPrefixes.Text
+                        .Split(',')
+                        .Select(s => s.Trim())
+                        .Where(s => !string.IsNullOrEmpty(s))
+                        .ToArray();
+                }
+                return MeasurementPointFilter.BodyPrefixes;
+            }
+        }
+
+        private string[] CurrentFilterOlpKeywords
+        {
+            get
+            {
+                if (CurrentFilterMode != FilterMode.Custom) return null;
+                return txtFilterOlpKeywords.Text
+                    .Split(',')
+                    .Select(s => s.Trim())
+                    .Where(s => !string.IsNullOrEmpty(s))
+                    .ToArray();
+            }
+        }
 
         public ConstellationForm()
         {
@@ -280,6 +329,50 @@ namespace ConstellationAddon
             grpPaths.Controls.Add(btnClearPaths);
             this.Controls.Add(grpPaths);
             y += 110;
+
+            // ── Measurement Point Filter ──────────────────────────────
+            var grpFilter = new GroupBox
+            {
+                Text = "Measurement Point Filter",
+                Left = lx,
+                Top = y,
+                Width = 806,
+                Height = 100,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+
+            rbFilterNone = new RadioButton { Text = "No Filter", Left = 8, Top = 20, Width = 90, Height = 20 };
+            rbFilterAuto = new RadioButton { Text = "Auto", Left = 105, Top = 20, Width = 70, Height = 20, Checked = true };
+            rbFilterCustom = new RadioButton { Text = "Custom", Left = 180, Top = 20, Width = 80, Height = 20 };
+            grpFilter.Controls.Add(rbFilterNone);
+            grpFilter.Controls.Add(rbFilterAuto);
+            grpFilter.Controls.Add(rbFilterCustom);
+
+            grpFilter.Controls.Add(new Label { Text = "Prefixes:", Left = 8, Top = 50, Width = 90, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            txtFilterPrefixes = new TextBox { Left = 102, Top = 48, Width = 300, Height = 22, Text = "mp", Enabled = false };
+            grpFilter.Controls.Add(txtFilterPrefixes);
+
+            grpFilter.Controls.Add(new Label { Text = "OLP keywords:", Left = 8, Top = 76, Width = 90, Height = 20, TextAlign = ContentAlignment.MiddleLeft });
+            txtFilterOlpKeywords = new TextBox
+            {
+                Left = 102,
+                Top = 74,
+                Width = 690,
+                Height = 22,
+                Text = "meas, cmeas, inline, VW_USER, TECH10, PRC_IMT",
+                Enabled = false,
+                Anchor = AnchorStyles.Top | AnchorStyles.Left | AnchorStyles.Right
+            };
+            grpFilter.Controls.Add(txtFilterOlpKeywords);
+
+            rbFilterCustom.CheckedChanged += (s, e) =>
+            {
+                txtFilterPrefixes.Enabled = rbFilterCustom.Checked;
+                txtFilterOlpKeywords.Enabled = rbFilterCustom.Checked;
+            };
+
+            this.Controls.Add(grpFilter);
+            y += 108;
 
             // ── Collision Pair ────────────────────────────────────
             var grpCollision = new GroupBox
@@ -624,6 +717,19 @@ namespace ConstellationAddon
                 {
                     var loc = obj as ITxRoboticLocationOperation;
                     if (loc == null) continue;
+
+                    // 0. Measurement point filter
+                    if (CurrentFilterMode == FilterMode.Auto)
+                    {
+                        if (!MeasurementPointFilter.IsMeasurementPoint(loc, CurrentFilterPrefixes))
+                            continue;
+                    }
+                    else if (CurrentFilterMode == FilterMode.Custom)
+                    {
+                        if (!MeasurementPointFilter.IsMeasurementPoint(loc, CurrentFilterPrefixes, CurrentFilterOlpKeywords))
+                            continue;
+                    }
+                    // FilterMode.NoFilter: every location is included
 
                     // 1. Jump
                     bool reached = followMode.JumpRobotToLocation(loc);
