@@ -79,5 +79,9 @@
   <ItemGroup>
     <None Include="README.md" />
   </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="perc_01_03944_10_16x16.bmp" />
+    <EmbeddedResource Include="perc_01_03944_10_32x32.png" />
+  </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
 </Project>

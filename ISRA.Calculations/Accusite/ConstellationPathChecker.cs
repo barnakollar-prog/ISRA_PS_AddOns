@@ -189,6 +189,8 @@ namespace ISRA.Calculations.AccuSite
             string name = componentName.ToLower();
             if (name.Contains("01-03944-10"))
                 return new SensorHolder_Perc_01_03944_10();
+            if (name.Contains("01-03921-10"))
+                return new SensorHolder_Perc_01_03921_10();
             return null;
         }
     }

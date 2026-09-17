@@ -271,7 +271,8 @@ namespace ISRA.Calculations.AccuSite
                         VisibleFromCameras = clearCameras
                     });
                 }
-                else if (blockerName != null)
+
+                if (blockerName != null)
                 {
                     blocked.Add(new BlockedEmitterInfo
                     {
@@ -393,7 +394,10 @@ namespace ISRA.Calculations.AccuSite
 
                     if (blocker == null) continue;
 
-                    return (blocker as TxComponent)?.Name ?? blocker.ToString();
+                    string blockerLabel = (blocker as TxComponent)?.Name
+                        ?? (blocker as ITxObject)?.Name
+                        ?? blocker.ToString();
+                    return blockerLabel;
                 }
 
                 return null;

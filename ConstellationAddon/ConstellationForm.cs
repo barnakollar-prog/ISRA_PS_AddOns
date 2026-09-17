@@ -889,17 +889,53 @@ namespace ConstellationAddon
                             string fmt2 = double.IsNaN(a2) ? "-" : string.Format("{0:F1}", a2);
                             string fmt3 = double.IsNaN(a3) ? "-" : string.Format("{0:F1}", a3);
 
+                            // Blocked check — van-e LOS blokk erre az emitterre?
+                            string blockedBy = null;
+                            if (visibility.BlockedEmitters != null)
+                            {
+                                foreach (var b in visibility.BlockedEmitters)
+                                {
+                                    if (b.EmitterName == emitters[ei].Name)
+                                    {
+                                        blockedBy = b.BlockedBy;
+                                        break;
+                                    }
+                                }
+                            }
+
+                            // Status meghatározás
+                            string statusText;
+                            Color statusColor;
+                            if (!inFov)
+                            {
+                                statusText = "FOV";
+                                statusColor = Color.Gray;
+                            }
+                            else if (blockedBy != null)
+                            {
+                                statusText = "BLOCKED: " + blockedBy;
+                                statusColor = Color.OrangeRed;
+                            }
+                            else if (allOk)
+                            {
+                                statusText = "OK";
+                                statusColor = Color.DarkGreen;
+                            }
+                            else
+                            {
+                                statusText = "NOK";
+                                statusColor = Color.DarkRed;
+                            }
+
                             string nodeText = FormatAngleDetailRow(
                                 emitters[ei].Group,
                                 emitters[ei].Name,
                                 fmt1, fmt2, fmt3,
                                 inFov ? "YES" : "NO",
-                                allOk ? "OK" : (inFov ? "NOK" : "FOV"));
+                                statusText);
 
                             var emitterNode = new TreeNode(nodeText);
-                            emitterNode.ForeColor = allOk ? Color.DarkGreen :
-                                                    !inFov ? Color.Gray :
-                                                             Color.DarkRed;
+                            emitterNode.ForeColor = statusColor;
                             pointNode.Nodes.Add(emitterNode);
                         }
 
@@ -1044,6 +1080,8 @@ namespace ConstellationAddon
             if (string.IsNullOrEmpty(typeId)) return null;
             if (typeId == "perc_01-03944-10")
                 return new SensorHolder_Perc_01_03944_10();
+            if (typeId == "perc_01-03921-10")
+                return new SensorHolder_Perc_01_03921_10();
             return null;
         }
         private void OnVisFilterChanged(object sender, EventArgs e)

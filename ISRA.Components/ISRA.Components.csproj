@@ -57,6 +57,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Accusite\SensorHolders\ISensorHolder.cs" />
+    <Compile Include="Accusite\SensorHolders\perc_01-03921-10.cs" />
     <Compile Include="Accusite\SensorHolders\perc_01-03944-10.cs" />
     <Compile Include="Accusite\SensorHolders\SensorHolderCatalog.cs" />
     <Compile Include="Accusite\Stars\IStar.cs" />

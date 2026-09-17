@@ -14,7 +14,7 @@ namespace ISRA.Components.AccuSite.SensorHolders
             new Dictionary<string, string>
             {
                 { "perc_01-03944-10", "Perceptron 01-03944-10 (40 LEDs, 8 groups)" },
-                // { "perc_01-03944-20", "Perceptron 01-03944-20" },  // future
+                { "perc_01-03921-10", "Perceptron 01-03921-10 (40 LEDs, 8 groups)" },
             };
 
         /// <summary>Returns true if the given type ID is in the catalog.</summary>
